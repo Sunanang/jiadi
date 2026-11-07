@@ -93,6 +93,10 @@ Docker 使用持久化卷 `jiadi-data`。升级时保留该卷；删除卷会删
 
 前置：应用中心已安装 **Node.js v22**。
 
+**直接下载安装**：从 [Releases](https://github.com/Sunanang/jiadi/releases/latest) 取 `jiadi-<版本>-fnos-all.fpk`，在应用中心「手动安装」。
+
+**自己打包**：
+
 ```bash
 npm run pack:fpk
 ```
