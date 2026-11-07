@@ -4,6 +4,7 @@
   <p><strong>不记流水、不做预算、不连银行的家庭总账。</strong></p>
   <p>没有一笔笔的收入支出，只有固定周期的资金盘点：这个月家里有多少钱，一眼看得见它怎么涨。</p>
   <p>
+    <a href="https://sunanang.github.io/jiadi/">官网</a> ·
     <a href="https://github.com/Sunanang/jiadi/releases">获取安装包</a> ·
     <a href="#开始使用">快速开始</a> ·
     <a href="#共享密码与备份">数据与备份</a> ·
@@ -160,6 +161,7 @@ npm start
 ├── scripts/            # build-fpk.sh 打包、pack.sh 通用包、shots.mjs 截图
 ├── tests/              # 服务端、浏览器回归、HTTP 验收、网关首用流程
 ├── test/               # 畸形输入探针与本地截图页
+├── website/            # 官网（单文件静态站，零依赖零构建）
 ├── docs/               # 验收记录、界面截图、捐赠二维码
 ├── verify.sh           # 部署后线上自检（环境变量驱动）
 ├── 人工验收清单.md      # 发版人工验收步骤
@@ -192,6 +194,17 @@ npm run shots          # 用演示数据重新生成 docs/screenshots/
 - **上锁后草稿没了**：锁定时未提交的输入不会保留，只有空闲顺延缓冲（最多 2 次、累计约 45 分钟），解锁页已写明这一行为。
 - **飞牛里桌面图标空白**：桌面图标读 `app.tgz` 内 `ui/images/icon_{16,32,48,64,128,256}.png`，应用市场读包根目录的 `ICON.PNG` / `ICON_256.PNG`，两套文件必须都在。
 - **数据在哪个目录**：源码/Docker 默认项目下 `data/`（卷 `jiadi-data`），飞牛应用在应用数据目录；备份的永远是 `ledger.json`。
+
+## 官网
+
+官网源码在 [`website/`](website/)，单文件静态站，零依赖零构建（`index.html` 里内联全部 CSS，无脚本）。推送到 `main` 且 `website/` 有改动时，由 [GitHub Actions](.github/workflows/pages.yml) 发布到 <https://sunanang.github.io/jiadi/>。
+
+本地预览：
+
+```bash
+cd website
+python3 -m http.server 8080
+```
 
 ## 捐赠
 

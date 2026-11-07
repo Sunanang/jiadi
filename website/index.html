@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>家底 · 家庭资产台账</title>
+<meta name="description" content="家底是一款简约的家庭总账。没有一笔笔的收入支出，只有固定周期的资金盘点：这个月家里有多少钱，一眼看得见它怎么涨。零依赖、全本地存储、开源。" />
+<meta name="theme-color" content="#0F1318" />
+<link rel="icon" href="assets/icon.png" />
+<meta property="og:title" content="家底 · 家庭资产台账" />
+<meta property="og:description" content="不记流水、不做预算、不连银行。只按固定周期盘点家庭资金，直观看见净值怎么涨。" />
+<meta property="og:image" content="assets/home-dark.png" />
+<meta property="og:type" content="website" />
+<style>
+  *{box-sizing:border-box}
+  :root{
+    color-scheme:dark;
+    --bg:#0F1318; --card:#1A2029; --raised:#232B36; --raised-2:#1B222B;
+    --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.16);
+    --ink:#E6EDF5; --ink-2:#A5B3C4; --mut:#7C8A9B;
+    --asset:#6EA3D2; --debt:#D97757; --up:#E08B6A; --down:#4FBE8E;
+    --solid:#DCE6F1; --on-solid:#101720; --solid-hover:#C6D4E4;
+    --code-bg:#131920; --code-line:rgba(255,255,255,.08);
+    --shadow:0 1px 2px rgba(0,0,0,.5);
+    --shadow-lg:0 24px 60px -32px rgba(0,0,0,.9);
+    --r:14px; --r-sm:10px;
+    --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --num:"SF Mono",ui-monospace,SFMono-Regular,Menlo,"Roboto Mono","PingFang SC",monospace;
+  }
+  @media (prefers-color-scheme:light){
+    :root{
+      color-scheme:light;
+      --bg:#F5F7FA; --card:#FFFFFF; --raised:#EDF1F6; --raised-2:#F7F9FC;
+      --line:rgba(31,58,95,.10); --line-2:rgba(31,58,95,.18);
+      --ink:#1F3A5F; --ink-2:#5A6B80; --mut:#8794A5;
+      --asset:#4A7BA7; --debt:#B4553F; --up:#B4553F; --down:#2E7D5B;
+      --solid:#1F3A5F; --on-solid:#FFFFFF; --solid-hover:#182F4D;
+      --code-bg:#F0F3F8; --code-line:rgba(31,58,95,.12);
+      --shadow:0 1px 2px rgba(31,58,95,.08);
+      --shadow-lg:0 24px 60px -36px rgba(22,40,63,.55);
+    }
+  }
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:var(--asset);text-decoration:none}
+  a:hover{text-decoration:underline;text-underline-offset:3px}
+  h1,h2,h3{line-height:1.25;letter-spacing:-.01em;margin:0}
+  .num{font-family:var(--num);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  :focus-visible{outline:2px solid var(--asset);outline-offset:3px;border-radius:6px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+  /* 顶栏 */
+  .top{border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(140%) blur(8px);position:sticky;top:0;z-index:10}
+  .top .wrap{display:flex;align-items:center;gap:20px;height:62px}
+  .brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:600;font-size:16px}
+  .brand img{width:26px;height:26px;border-radius:7px;display:block}
+  .brand:hover{text-decoration:none}
+  .brand span b{font-weight:600}
+  .brand span i{font-style:normal;color:var(--mut);font-weight:400;font-size:13px;margin-left:8px}
+  .nav{display:flex;gap:22px;margin-left:auto;font-size:14px}
+  .nav a{color:var(--ink-2)}
+  .nav a:hover{color:var(--ink);text-decoration:none}
+  .nav .gh{display:inline-flex;align-items:center;gap:7px;color:var(--ink)}
+  .nav svg{width:16px;height:16px;fill:currentColor}
+  @media (max-width:760px){.nav a:not(.gh){display:none}}
+
+  /* 首屏 */
+  .hero{padding:72px 0 40px}
+  .hero .wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:56px;align-items:center}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--mut);border:1px solid var(--line-2);border-radius:999px;padding:4px 12px;margin-bottom:22px}
+  .eyebrow b{color:var(--asset);font-weight:600}
+  .hero h1{font-size:clamp(30px,4.2vw,46px);font-weight:650}
+  .hero h1 em{font-style:normal;color:var(--asset)}
+  .hero p.lead{margin:18px 0 0;color:var(--ink-2);font-size:17px;max-width:34em}
+  .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+  .btn{display:inline-flex;align-items:center;gap:9px;height:44px;padding:0 20px;border-radius:var(--r-sm);border:1px solid transparent;font-size:15px;font-weight:500;background:var(--solid);color:var(--on-solid);transition:background .16s}
+  .btn:hover{background:var(--solid-hover);text-decoration:none}
+  .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line-2)}
+  .btn.ghost:hover{background:var(--raised);text-decoration:none}
+  .hero .meta{margin-top:22px;font-size:13px;color:var(--mut)}
+  /* 首屏的产品卡片：用 HTML 复刻应用里的等式卡，任何分辨率都清晰 */
+  .ledger{border:1px solid var(--line);border-radius:var(--r);background:var(--card);box-shadow:var(--shadow-lg);padding:22px 24px 18px}
+  .ledger .lc-top{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--mut);margin-bottom:18px}
+  .ledger .lc-top b{color:var(--down);font-weight:500;display:inline-flex;align-items:center;gap:6px}
+  .ledger .lc-top b::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+  .ledger .lc-top span{margin-left:auto;font-family:var(--num)}
+  .ledger .lc-eq{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px 14px}
+  .ledger .lc-cell{display:flex;flex-direction:column;gap:2px}
+  .ledger .lc-cell span{font-size:12.5px;color:var(--mut)}
+  .ledger .lc-cell b{font-family:var(--num);font-size:26px;font-weight:600;letter-spacing:-.02em}
+  .ledger .lc-cell.net b{font-size:34px;color:var(--ink)}
+  .ledger .lc-op{font-size:20px;color:var(--mut);font-family:var(--num);padding:0 2px;align-self:center}
+  .ledger .lc-foot{display:flex;align-items:center;gap:14px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--mut)}
+    .ledger .lc-delta{color:var(--up);font-family:var(--num);font-size:13px}
+  .ledger .lc-foot .lc-debt{margin-left:auto;font-family:var(--num)}
+  .ledger .lc-chart{display:block;width:100%;height:96px;margin-top:14px}
+  .ledger .lc-chart .lc-line{stroke:var(--asset)}
+  .ledger .lc-chart .lc-dot{fill:var(--asset)}
+  .ledger .lc-chart .lc-stop-a{stop-color:var(--asset);stop-opacity:.22}
+  .ledger .lc-chart .lc-stop-b{stop-color:var(--asset);stop-opacity:0}
+  @media (max-width:480px){
+    .ledger{padding:18px}
+    .ledger .lc-cell b{font-size:21px}
+    .ledger .lc-cell.net b{font-size:27px}
+  }
+  @media (max-width:880px){
+    .hero{padding:44px 0 28px}
+    .hero .wrap{grid-template-columns:1fr;gap:34px}
+  }
+
+  /* 通用小节 */
+  section{padding:64px 0;border-top:1px solid var(--line)}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:10px}
+  .sec-head h2{font-size:24px;font-weight:620}
+  .sec-head span{font-size:13px;color:var(--mut);letter-spacing:.08em;text-transform:uppercase}
+  .sec-desc{color:var(--ink-2);margin:0 0 34px;max-width:44em}
+
+  /* 对比 */
+  .compare{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+  .panel{border:1px solid var(--line);border-radius:var(--r);padding:22px 24px;background:var(--card);box-shadow:var(--shadow)}
+  .panel h3{font-size:16px;margin-bottom:14px;display:flex;align-items:center;gap:9px}
+  .panel ul{margin:0;padding-left:18px;color:var(--ink-2);font-size:15px}
+  .panel li{margin:8px 0}
+  .panel.dim{background:var(--raised-2)}
+  .panel.dim h3{color:var(--mut)}
+  .panel.own{border-color:color-mix(in srgb,var(--asset) 40%,var(--line))}
+  .panel.own h3{color:var(--ink)}
+  .panel.own h3::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--asset)}
+  @media (max-width:760px){.compare{grid-template-columns:1fr}}
+
+  /* 界面 */
+  .shots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;align-items:start}
+  .shots figure{margin:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--card);box-shadow:var(--shadow)}
+  .shots img{display:block;width:100%;height:auto;aspect-ratio:1440/820;object-fit:cover;object-position:top center}
+  .shots figcaption{font-size:13px;color:var(--ink-2);padding:12px 16px;border-top:1px solid var(--line)}
+  .shots figure.phone{display:flex;flex-direction:column;align-items:center;background:transparent;border:0;box-shadow:none}
+  .shots figure.phone img{aspect-ratio:auto;object-fit:fill;max-width:272px;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow-lg)}
+  .shots figure.phone figcaption{border-top:0;text-align:center}
+  @media (max-width:760px){.shots{grid-template-columns:1fr}}
+
+  /* 功能卡 */
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+  .card{border:1px solid var(--line);border-radius:var(--r);padding:20px;background:var(--card);box-shadow:var(--shadow)}
+  .card h3{font-size:15px;margin-bottom:8px}
+  .card p{margin:0;color:var(--ink-2);font-size:14.5px}
+  @media (max-width:880px){.grid{grid-template-columns:1fr 1fr}}
+  @media (max-width:560px){.grid{grid-template-columns:1fr}}
+
+  /* 一眼看懂的数字 */
+  .figures{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin-top:34px}
+  .figure{border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;background:var(--raised-2)}
+  .figure b{display:block;font-size:22px;font-weight:600}
+  .figure span{font-size:13px;color:var(--mut)}
+  @media (max-width:760px){.figures{grid-template-columns:1fr 1fr}}
+  @media (max-width:420px){.figures{grid-template-columns:1fr}}
+  @media (max-width:420px){table{font-size:13.5px}th,td{padding:9px 10px}}
+
+  /* 安装 */
+  .install{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+  .step{min-width:0;border:1px solid var(--line);border-radius:var(--r);padding:22px 24px;background:var(--card);box-shadow:var(--shadow)}
+  .step h3{font-size:16px;display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .step h3 i{font-style:normal;font-size:12px;font-weight:600;color:var(--on-solid);background:var(--solid);width:22px;height:22px;border-radius:50%;display:grid;place-items:center}
+  .step p{margin:6px 0 12px;color:var(--ink-2);font-size:14.5px}
+  pre{margin:0;max-width:100%;background:var(--code-bg);border:1px solid var(--code-line);border-radius:var(--r-sm);padding:14px 16px;overflow-x:auto;font-family:var(--num);font-size:13px;line-height:1.7;color:var(--ink)}
+  code{font-family:var(--num);font-size:.94em}
+  p code,li code,td code{background:var(--raised);border:1px solid var(--line);border-radius:5px;padding:1px 5px;overflow-wrap:anywhere}
+  .note{font-size:13px;color:var(--mut);margin:10px 0 0}
+
+  /* 表格 */
+  table{width:100%;border-collapse:collapse;font-size:14.5px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:500;font-size:13px;white-space:nowrap}
+  td:first-child{white-space:nowrap}
+  .table-wrap{border:1px solid var(--line);border-radius:var(--r);overflow-x:auto;background:var(--card);box-shadow:var(--shadow)}
+
+  /* FAQ */
+  details{border:1px solid var(--line);border-radius:var(--r-sm);background:var(--card);padding:0 18px;margin-bottom:10px}
+  details[open]{border-color:var(--line-2)}
+  summary{cursor:pointer;padding:15px 0;font-size:15px;font-weight:500;list-style:none;display:flex;justify-content:space-between;gap:16px;align-items:center}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"＋";color:var(--mut);font-size:15px}
+  details[open] summary::after{content:"－"}
+  details p{margin:0 0 16px;color:var(--ink-2);font-size:14.5px}
+
+  /* 页脚 */
+  footer{border-top:1px solid var(--line);padding:40px 0 56px;color:var(--mut);font-size:13.5px}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center}
+  footer .links{display:flex;gap:20px;margin-left:auto}
+  footer a{color:var(--ink-2)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="assets/icon.png" alt="家底" /><span><b>家底</b><i>家庭资产台账</i></span></a>
+    <nav class="nav">
+      <a href="#why">为什么不记流水</a>
+      <a href="#ui">界面</a>
+      <a href="#install">安装</a>
+      <a href="#faq">常见问题</a>
+      <a class="gh" href="https://github.com/Sunanang/jiadi">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero" style="border-top:0">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow"><b>v0.5.3</b> · 开源 · 零依赖</div>
+        <h1>这个月家里<br />有<em>多少钱</em></h1>
+        <p class="lead">家底不是一款记账软件。没有一笔笔的收入支出，只有固定周期的资金盘点——把「现在家里有多少钱」记清楚，剩下的交给那条曲线。</p>
+        <div class="cta">
+          <a class="btn" href="https://github.com/Sunanang/jiadi/releases/latest">下载安装包</a>
+          <a class="btn ghost" href="#install">看安装方式</a>
+        </div>
+        <p class="meta">飞牛 NAS 微应用 · Docker · 单文件源码；数据全在你自己的机器上。</p>
+      </div>
+      <div class="ledger" role="img" aria-label="家底首页等式卡示意：总资产 213.6 万减总负债 85.0 万等于净资产 128.6 万，较上次记录 +33,887，负债率 39.8%">
+        <div class="lc-top"><b>本月已盘点</b><span>2026-11</span></div>
+        <div class="lc-eq">
+          <div class="lc-cell"><span>总资产</span><b>213.6 万</b></div>
+          <div class="lc-op">−</div>
+          <div class="lc-cell"><span>总负债</span><b>85.0 万</b></div>
+          <div class="lc-op">=</div>
+          <div class="lc-cell net"><span>净资产</span><b>128.6 万</b></div>
+        </div>
+        <svg class="lc-chart" viewBox="0 0 480 96" preserveAspectRatio="none" aria-hidden="true">
+          <defs><linearGradient id="lcArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" class="lc-stop-a" />
+            <stop offset="100%" class="lc-stop-b" />
+          </linearGradient></defs>
+          <path class="lc-line" d="M0 74 L48 71 L96 66 L144 60 L192 55 L240 47 L288 38 L336 33 L384 30 L432 22 L480 14" fill="none" stroke-width="2" stroke-linecap="round" />
+          <path d="M0 74 L48 71 L96 66 L144 60 L192 55 L240 47 L288 38 L336 33 L384 30 L432 22 L480 14 L480 96 L0 96 Z" fill="url(#lcArea)" />
+          <circle class="lc-dot" cx="480" cy="14" r="3.5" />
+        </svg>
+        <div class="lc-foot"><span class="lc-delta">▲ +33,887 · +2.71%</span><span>较上次记录</span><span class="lc-debt">负债率 39.8%</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why">
+    <div class="wrap">
+      <div class="sec-head"><span>Why</span><h2>记账软件记流水，家底只盘点</h2></div>
+      <p class="sec-desc">一笔笔记流水，坚持不了三周；一个月盘一次余额，才真的会记满一年。家底把「记什么」这件事压到最小。</p>
+      <div class="compare">
+        <div class="panel dim">
+          <h3>记账软件</h3>
+          <ul>
+            <li>每笔支出都要记，漏一笔就对不上</li>
+            <li>分类、预算、标签，先决条件越来越多</li>
+            <li>连银行、连账号，数据要出家门</li>
+            <li>月底看报表，还是不知道家里有多少钱</li>
+          </ul>
+        </div>
+        <div class="panel own">
+          <h3>家底</h3>
+          <ul>
+            <li>只填余额：这个账户今天还剩多少</li>
+            <li>不分类每笔开销，只看结构占比的变化</li>
+            <li>不连银行、不连第三方，全本地存储</li>
+            <li>一行等式看完：总资产 − 总负债 = 净资产</li>
+          </ul>
+        </div>
+      </div>
+      <div class="figures">
+        <div class="figure"><b class="num">1</b><span>一份账本，电脑手机共用</span></div>
+        <div class="figure"><b class="num">0</b><span>第三方依赖，克隆即运行</span></div>
+        <div class="figure"><b class="num">15<span style="font-size:13px"> 分钟</span></b><span>无操作自动上锁</span></div>
+        <div class="figure"><b class="num">AES-256</b><span>导出备份一律加密</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="ui">
+    <div class="wrap">
+      <div class="sec-head"><span>Interface</span><h2>七个视图，一眼看懂</h2></div>
+      <p class="sec-desc">没有花哨的动效，也没有滚动直播式的图表。深色与浅色都是同一套排版，手机上照着 390px 重排。</p>
+      <div class="shots">
+        <figure><img src="assets/people.png" alt="按人归属：每位成员的净值与占比圆环" /><figcaption>按人归属 · 谁占多少</figcaption></figure>
+        <figure><img src="assets/detail.png" alt="按类明细：现金、存款、投资、固定资产与负债分组" /><figcaption>按类明细 · 结构占比</figcaption></figure>
+        <figure><img src="assets/checkin.png" alt="盘点流：一次只填余额，跳变需要确认" /><figcaption>盘点流 · 只填余额</figcaption></figure>
+        <figure><img src="assets/trend.png" alt="趋势：净值、资产负债、结构三种口径" /><figcaption>趋势 · 净值 / 资产负债 / 结构</figcaption></figure>
+        <figure><img src="assets/settings.png" alt="设置页：显示偏好、计算口径与数据导出入口" /><figcaption>设置 · 口径与导出</figcaption></figure>
+        <figure class="phone"><img src="assets/mobile-home.png" alt="手机 390px 首页：净资产卡片、趋势与底部导航" /><figcaption>手机 390px · 底部导航</figcaption></figure>
+      </div>
+      <p class="note">截图全部来自仓库内置的演示数据，不是任何人的真实账本。</p>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head"><span>Features</span><h2>该有的都有，不该有的不做</h2></div>
+      <p class="sec-desc">从 0.3 到 0.5，修的都是同一件事：账本不能坏、数据不能丢、界面不能骗人。</p>
+      <div class="grid">
+        <div class="card"><h3>盘点即历史</h3><p>每次填余额自动写进历史，趋势图按月或按年聚合成线，悬停看当月数值。</p></div>
+        <div class="card"><h3>多端一份账本</h3><p>电脑与手机访问同一服务。另一台已更新时，旧页面保存会被拒绝，不会互相覆盖。</p></div>
+        <div class="card"><h3>密码门禁</h3><p>进入账本、解开遮罩、导出备份共用一个应用密码；15 分钟无操作自动上锁，锁定态接口全部拒绝。</p></div>
+        <div class="card"><h3>加密导出</h3><p>JSON 备份、CSV、操作日志、HTML 报告都在服务端加密后下载，明文只能在自己这边还原。</p></div>
+        <div class="card"><h3>写入不会半截</h3><p>临时文件 + 同步落盘 + 原子替换，断电不会留下半个账本；同一个数据目录只允许一个进程写。</p></div>
+        <div class="card"><h3>隐私遮罩</h3><p>一键把金额换成圆点、图表虚化，在别人旁边也能打开看一眼。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <div class="sec-head"><span>Install</span><h2>三种装法，选一种</h2></div>
+      <p class="sec-desc">同一个服务不要重复启动多个进程指向不同数据目录。</p>
+      <div class="install">
+        <div class="step">
+          <h3><i>1</i>飞牛 NAS 微应用（推荐）</h3>
+          <p>不占独立端口，走飞牛统一网关 <code>/app/jiadi</code>，用 NAS 统一登录。前置：应用中心已装 Node.js v22。到 <a href="https://github.com/Sunanang/jiadi/releases/latest">Releases</a> 下载 <code>jiadi-&lt;版本&gt;-fnos-all.fpk</code>，应用中心「手动安装」。</p>
+          <pre>trim-cli --profile home --host &lt;NAS&gt; app install-fpk jiadi-&lt;版本&gt;-fnos-all.fpk \
+  --volume-id &lt;卷ID&gt; --custom-parameters '[]' --yes</pre>
+          <p class="note">已装旧端口版的，先在应用中心卸载（保留数据）再装新包。</p>
+        </div>
+        <div class="step">
+          <h3><i>2</i>Docker Compose</h3>
+          <p>任意常驻主机都可以，数据落在持久化卷 <code>jiadi-data</code>。</p>
+          <pre>git clone https://github.com/Sunanang/jiadi.git
+cd jiadi
+docker compose up -d --build</pre>
+        </div>
+        <div class="step">
+          <h3><i>3</i>源码直接跑</h3>
+          <p>只要 Node.js 22+，没有 <code>node_modules</code>，没有构建步骤。</p>
+          <pre>git clone https://github.com/Sunanang/jiadi.git
+cd jiadi
+npm start   # http://localhost:8080</pre>
+          <p class="note">首次访问设置账本密码；手机与其他电脑访问 <code>http://&lt;主机局域网 IP&gt;:8080</code>，用同一密码登录。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="data">
+    <div class="wrap">
+      <div class="sec-head"><span>Data</span><h2>数据在你手里，也只有在你手里</h2></div>
+      <p class="sec-desc">没有账号、没有云同步、没有遥测。服务端唯一的账本文件是 <code>data/ledger.json</code>，密码只保存加盐哈希。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>项</th><th>约定</th></tr></thead>
+          <tbody>
+            <tr><td>存储位置</td><td>源码/Docker 默认项目下 <code>data/</code>；飞牛应用在应用数据目录</td></tr>
+            <tr><td>自动备份</td><td><strong>没有</strong>。请自行每月导出一次加密备份，存在服务之外</td></tr>
+            <tr><td>浏览器里</td><td>只存主题、显示偏好、备份提醒日期与引导状态，账本不进 localStorage</td></tr>
+            <tr><td>导出加密</td><td>AES-256-GCM 信封，明文只能在「导入 / 解密」里还原</td></tr>
+            <tr><td>远程访问</td><td>请用 HTTPS 反向代理或私有网络入口（WireGuard / Tailscale），不要公网裸 HTTP</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <div class="sec-head"><span>FAQ</span><h2>常见问题</h2></div>
+      <p class="sec-desc">问得最多的几件事，一次说清。</p>
+
+      <details>
+        <summary>它和记账软件到底差在哪？</summary>
+        <p>记账软件记「钱怎么花掉」，家底记「钱还剩多少」。你只在一个月里挑一天，把每个账户的余额填一遍；家底负责把它变成趋势、结构和按人归属。没有流水要补，也没有分类要纠结。</p>
+      </details>
+      <details>
+        <summary>需要连银行吗？数据会上传吗？</summary>
+        <p>不连。不接任何银行、券商或第三方接口，也不会把账本发到任何服务器。所有数据就在你自己那台机器上的一个 <code>ledger.json</code> 里。</p>
+      </details>
+      <details>
+        <summary>手机能用吗？</summary>
+        <p>能。手机和电脑访问同一个服务、同一份账本，390px 宽度有专门的布局；飞牛用户可以登录飞牛客户端后从桌面进入，不必记端口。</p>
+      </details>
+      <details>
+        <summary>忘记密码怎么办？</summary>
+        <p>账本密码不可找回。旧加密备份仍可用导出时的密码解开，请按备份恢复，而不是删账本文件。</p>
+      </details>
+      <details>
+        <summary>要备份吗？</summary>
+        <p>要，而且只能靠你自己。家底不做自动备份，也不留云端副本。建议每月导出一次加密 JSON，放在服务之外的网盘或移动硬盘里。</p>
+      </details>
+      <details>
+        <summary>可以在公网访问吗？</summary>
+        <p>本项目按家庭内网设计，不建议公网裸 HTTP 暴露。需要远程时用 HTTPS 反向代理或私有网络（WireGuard / Tailscale），并保持应用密码开启。</p>
+      </details>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 家底 · MIT 许可</span>
+    <span>与飞牛 NAS 及任何银行、券商无隶属或背书关系</span>
+    <span class="links">
+      <a href="https://github.com/Sunanang/jiadi">源码</a>
+      <a href="https://github.com/Sunanang/jiadi/releases">下载</a>
+      <a href="https://github.com/Sunanang/jiadi/issues">反馈</a>
+      <a href="https://github.com/Sunanang/jiadi/blob/main/README.md">文档</a>
+    </span>
+  </div>
+</footer>
+
+</body>
+</html>
