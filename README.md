@@ -13,6 +13,26 @@
 
 **零依赖、零构建、单文件前端**。全本地存储，不联网、不上报、不需要任何账号。
 
+## 界面
+
+下图全部来自 `jiadi-ui.html` 内置的 SEED 演示数据，不是任何人的真实账本。
+
+| 首页 · 深色 | 首页 · 浅色 | 趋势 |
+| --- | --- | --- |
+| ![首页深色](docs/screenshots/01-home-dark.png) | ![首页浅色](docs/screenshots/02-home-light.png) | ![趋势](docs/screenshots/03-trend.png) |
+
+| 按人归属 | 按类明细 | 盘点流 |
+| --- | --- | --- |
+| ![归属](docs/screenshots/04-people.png) | ![明细](docs/screenshots/05-detail.png) | ![盘点流](docs/screenshots/06-checkin.png) |
+
+| 只读报告 | 设置 | 账户抽屉 |
+| --- | --- | --- |
+| ![报告](docs/screenshots/07-report.png) | ![设置](docs/screenshots/08-settings.png) | ![抽屉](docs/screenshots/09-drawer.png) |
+
+手机 390px：<img src="docs/screenshots/10-mobile-home.png" width="240" alt="手机首页">
+
+截图由 `npm run shots` 重新生成（无头 Chrome + 演示数据，不接触真实账本）。
+
 ## 环境
 
 - Node.js 22+

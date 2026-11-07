@@ -20,6 +20,7 @@
     "pack": "bash scripts/pack.sh",
     "pack:fpk": "bash scripts/build-fpk.sh",
     "pack:zip": "bash scripts/pack.sh",
-    "test:gateway": "node tests/onboarding-gateway.mjs"
+    "test:gateway": "node tests/onboarding-gateway.mjs",
+    "shots": "node scripts/shots.mjs"
   }
 }

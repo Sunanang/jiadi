@@ -8,8 +8,8 @@ node_modules/
 test/seed.json
 test/build/seed.json
 
-# 截图取证（画面含真实资产数字）
-screenshots/
+# 截图取证（画面含真实资产数字）；docs/screenshots 是用演示数据生成的开源配图，允许入库
+/screenshots/
 audit/
 dev/audit/
 
