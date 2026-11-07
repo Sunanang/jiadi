@@ -726,7 +726,7 @@
    数据（假数据，但全部由同一份账户数组推导，互相自洽）
    ========================================================= */
 /* 版本号唯一来源：与 package.json / fnos/manifest 保持一致，scripts/build-fpk.sh 会校验三处相等 */
-const APP_VERSION = '0.5.2';
+const APP_VERSION = '0.5.3';
 
 const SEED_ACCOUNTS = [
   { id:'a1',  name:'招行活期',        cat:'现金',   member:'我',   amount:93214,  prev:92000,  date:'2026-11-05', opened:'2019-03-11', due:'',          note:'日常开销', inNet:true, remind:true,  months:80 },
@@ -3385,7 +3385,8 @@ $('#sideFoot').onclick = async()=>{
       <div class="kv"><span class="k">版本</span><span class="v">v${APP_VERSION} 共享账本</span></div>
       <div class="kv"><span class="k">数据文件</span><span class="v text" style="font-size:12px">服务端数据目录 · ledger.json</span></div>
       <div class="kv"><span class="k">账户 / 快照</span><span class="v">${ACCOUNTS.length} / ${getSnapshots().length}</span></div>
-      
+      <div class="kv"><span class="k">项目主页</span><span class="v text" style="font-size:12px"><a href="https://github.com/Sunanang/jiadi" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px">github.com/Sunanang/jiadi</a></span></div>
+      <div class="kv"><span class="k">许可</span><span class="v text">MIT 开源</span></div>
       <div class="kv"><span class="k">额度</span><span class="v text">无账号 · 无云同步 · 无遥测</span></div>`,
     foot:''
   });

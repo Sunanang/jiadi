@@ -2,7 +2,7 @@
 <div id="out">未运行</div>
 <script>
 fetch('seed.json').then(r=>r.json()).then(seed=>{
-  seed.snapshots=[{month:'2026-10',date:'2026-10-15',A:1750000,L:0},{month:'2026-11',date:'2026-11-06',A:1923049,L:0}];
+  seed.snapshots=[{month:'2026-10',date:'2026-10-15',A:1640000,L:0},{month:'2026-11',date:'2026-11-06',A:1712345,L:0}];
   localStorage.setItem('jiadi.data.v1', JSON.stringify(seed));
   const f=document.createElement('iframe');
   f.id='f'; f.src='http://127.0.0.1:8899/jiadi-ui.html';

@@ -1,6 +1,17 @@
 # 家底 · 家庭共享资产台账
 
-**版本 0.3.0**：电脑和手机访问同一服务，共用一份账户、成员、余额历史与月度快照。资产数据保存在服务端，各设备浏览器不再各自存一份账本。
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org/)
+
+不记流水、不做预算、不连银行。家底只做一件事：按固定周期盘点家庭资金，把「这个月家里有多少钱」记录清楚，然后直观地看到它怎么涨。
+
+**版本 0.5.3**：电脑和手机访问同一服务，共用一份账户、成员、余额历史与月度快照。资产数据保存在服务端，各设备浏览器不再各自存一份账本。
+
+- 源码仓库：<https://github.com/Sunanang/jiadi>
+- 问题与建议：<https://github.com/Sunanang/jiadi/issues>
+- 许可证：[MIT](LICENSE)
+
+**零依赖、零构建、单文件前端**。全本地存储，不联网、不上报、不需要任何账号。
 
 ## 环境
 
@@ -86,10 +97,10 @@ Docker 使用持久化卷 `jiadi-data`。升级时保留该卷；删除卷会删
 npm run pack:fpk
 ```
 
-产物：`dist/jiadi-0.3.1-fnos-all.fpk`。在应用中心「手动安装」。若已装旧的端口版，请先在应用中心卸载（保留数据），再安装新包：
+产物：`dist/jiadi-<版本>-fnos-all.fpk`（版本取自 `package.json`）。在应用中心「手动安装」。若已装旧的端口版，请先在应用中心卸载（保留数据），再安装新包：
 
 ```bash
-trim-cli --profile home --host <NAS> app install-fpk dist/jiadi-0.3.1-fnos-all.fpk \
+trim-cli --profile home --host <NAS> app install-fpk dist/jiadi-<版本>-fnos-all.fpk \
   --volume-id <卷ID> --custom-parameters '[]' --yes
 ```
 
@@ -107,6 +118,34 @@ npm run test:browser
 - `npm test`：服务端临时磁盘、接口、并发版本、会话、密码与加密恢复（无需监听固定端口）。
 - `npm run test:browser`：隔离 Chrome 配置下的页面回归与桌面 / 390px 截图（写入 `audit/`）。可用环境变量 `CHROME_PATH` 指定浏览器可执行文件。
 - 可选：`node tests/standalone.mjs`、`node tests/shared-browser.mjs` 生成可在浏览器打开的隔离检查页。
-- 通用 zip：`npm run pack:zip` → `dist/jiadi-v0.3.0.zip`。
+- 通用 zip：`npm run pack:zip` → `dist/jiadi-v<版本>.zip`。
 
 验收结论与边界见 [验收记录](docs/ACCEPTANCE.md)。
+
+部署到自家飞牛后可跑一次线上自检（脚本参数见文件头注释，需本地有 ssh 别名）：
+
+```bash
+JIADI_SSH_HOST=<NAS> JIADI_NAS_URL=http://<NAS>:<端口>/app/jiadi bash verify.sh
+```
+
+## 开源说明
+
+- **许可证**：MIT，可自由使用、修改、分发，保留版权声明即可。
+- **贡献**：欢迎 issue 与 PR。改动前先跑 `npm test`；涉及前端交互的改动请补浏览器回归。
+- **安全边界**：服务设计为家庭内网使用。请勿直接暴露到公网裸 HTTP；需要远程访问时用 HTTPS 反向代理或私有网络入口（如 WireGuard / Tailscale）。
+- **数据责任**：账本只存在你自己的机器上，没有云端副本。请自行定期导出加密备份，并放在服务之外。
+
+## 目录结构
+
+```
+server.mjs          Node 22 服务：网关 socket / 统一登录 / 账本读写 / 密码门禁 / 草稿暂存
+jiadi-ui.html       单文件前端（逻辑在 <script id="ledgerApp"> 内，由 shared-client.js 注入执行）
+shared-client.js    会话、密码页、空闲锁、轮询、草稿存取
+ledger-domain.mjs   normalizeData 严格校验
+fnos/               飞牛 OS 打包骨架（manifest / cmd / wizard / config）
+scripts/            打包脚本（pack.sh / build-fpk.sh）
+tests/ test/        服务端、浏览器回归、畸形输入矩阵、验收探针
+verify.sh           部署后线上自检
+人工验收清单.md      人工发版验收步骤
+docs/               验收记录与边界
+```
