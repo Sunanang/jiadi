@@ -158,6 +158,8 @@
   /* 界面 */
   .shots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;align-items:start}
   .shots figure{margin:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--card);box-shadow:var(--shadow)}
+  .shots .zoom{display:block;color:inherit}
+  .shots .zoom:hover{text-decoration:none}
   .shots img{display:block;width:100%;height:auto;aspect-ratio:1440/820;object-fit:cover;object-position:top center}
   .shots figcaption{font-size:13px;color:var(--ink-2);padding:12px 16px;border-top:1px solid var(--line)}
   .shots figure.phone{display:flex;flex-direction:column;align-items:center;background:transparent;border:0;box-shadow:none}
@@ -310,14 +312,14 @@
       <div class="sec-head"><span>Interface</span><h2>七个视图，一眼看懂</h2></div>
       <p class="sec-desc">没有花哨的动效，也没有滚动直播式的图表。深色与浅色都是同一套排版，手机上照着 390px 重排。</p>
       <div class="shots">
-        <figure><img src="assets/people.png" width="1440" height="1050" loading="lazy" decoding="async" alt="按人归属：每位成员的净值与占比圆环" /><figcaption>按人归属 · 谁占多少</figcaption></figure>
-        <figure><img src="assets/detail.png" width="1440" height="1050" loading="lazy" decoding="async" alt="按类明细：现金、存款、投资、固定资产与负债分组" /><figcaption>按类明细 · 结构占比</figcaption></figure>
-        <figure><img src="assets/checkin.png" width="1440" height="1050" loading="lazy" decoding="async" alt="盘点流：一次只填余额，跳变需要确认" /><figcaption>盘点流 · 只填余额</figcaption></figure>
-        <figure><img src="assets/trend.png" width="1440" height="1050" loading="lazy" decoding="async" alt="趋势：净值、资产负债、结构三种口径" /><figcaption>趋势 · 净值 / 资产负债 / 结构</figcaption></figure>
-        <figure><img src="assets/settings.png" width="1440" height="1050" loading="lazy" decoding="async" alt="设置页：显示偏好、计算口径与数据导出入口" /><figcaption>设置 · 口径与导出</figcaption></figure>
-        <figure class="phone"><img src="assets/mobile-home.png" width="390" height="844" loading="lazy" decoding="async" alt="手机 390px 首页：净资产卡片、趋势与底部导航" /><figcaption>手机 390px · 底部导航</figcaption></figure>
+        <figure><a class="zoom" href="assets/people.png" target="_blank" rel="noopener" title="点开看大图"><img src="assets/people.png" width="1440" height="1050" loading="lazy" decoding="async" alt="按人归属：每位成员的净值与占比圆环" /></a><figcaption>按人归属 · 谁占多少</figcaption></figure>
+        <figure><a class="zoom" href="assets/detail.png" target="_blank" rel="noopener" title="点开看大图"><img src="assets/detail.png" width="1440" height="1050" loading="lazy" decoding="async" alt="按类明细：现金、存款、投资、固定资产与负债分组" /></a><figcaption>按类明细 · 结构占比</figcaption></figure>
+        <figure><a class="zoom" href="assets/checkin.png" target="_blank" rel="noopener" title="点开看大图"><img src="assets/checkin.png" width="1440" height="1050" loading="lazy" decoding="async" alt="盘点流：一次只填余额，跳变需要确认" /></a><figcaption>盘点流 · 只填余额</figcaption></figure>
+        <figure><a class="zoom" href="assets/trend.png" target="_blank" rel="noopener" title="点开看大图"><img src="assets/trend.png" width="1440" height="1050" loading="lazy" decoding="async" alt="趋势：净值、资产负债、结构三种口径" /></a><figcaption>趋势 · 净值 / 资产负债 / 结构</figcaption></figure>
+        <figure><a class="zoom" href="assets/settings.png" target="_blank" rel="noopener" title="点开看大图"><img src="assets/settings.png" width="1440" height="1050" loading="lazy" decoding="async" alt="设置页：显示偏好、计算口径与数据导出入口" /></a><figcaption>设置 · 口径与导出</figcaption></figure>
+        <figure class="phone"><a class="zoom" href="assets/mobile-home.png" target="_blank" rel="noopener" title="点开看大图"><img src="assets/mobile-home.png" width="390" height="844" loading="lazy" decoding="async" alt="手机 390px 首页：净资产卡片、趋势与底部导航" /></a><figcaption>手机 390px · 底部导航</figcaption></figure>
       </div>
-      <p class="note">截图全部来自仓库内置的演示数据，不是任何人的真实账本。</p>
+      <p class="note">截图全部来自仓库内置的演示数据，不是任何人的真实账本；手机上看不清可以点开图片看原尺寸。</p>
     </div>
   </section>
 
