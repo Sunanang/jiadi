@@ -32,6 +32,23 @@ cp docs/screenshots/01-home-dark.png website/assets/home-dark.png
 # 其余同名对应：04-people / 05-detail / 06-checkin / 03-trend / 08-settings / 10-mobile-home
 ```
 
+## 自检项
+
+官网没脚本，所以「测」就是量。以下每项都在本机（`python3 -m http.server`）与线上 Pages 各跑一遍：
+
+| 项 | 判据 |
+| --- | --- |
+| 横向溢出 | 320 / 360 / 390 / 768 / 1024 / 1280 / 1440 / 1920 下 `documentElement.scrollWidth === innerWidth` |
+| 锚点跳转 | 点导航后目标小节标题的 `getBoundingClientRect().top` ≥ 吸顶栏高度（不会被挡住） |
+| 移动导航 | ≤600px 隐藏「为什么不记流水」、≤760px 隐藏 GitHub 文字，其余链接完整可见不被裁切 |
+| 图片 | 每张 `img.complete && naturalWidth > 0` |
+| 控制台 | 无 error、无失败请求 |
+| 对比度 | 正文/说明/小标/页脚在深浅两主题下 ≥ 4.5:1（浅色 `--mut:#5B6B7E`、`--ink-2:#4E5F75` 是为此定的） |
+| 结构 | 唯一 `h1`、无重复 `id`、所有 `img` 有 `alt`、`lang="zh-CN"` |
+| FAQ | `<details>` 可展开且内容可见 |
+
+窄屏必须用 CDP 的 `Emulation.setDeviceMetricsOverride` 量，macOS 上 `chrome --headless=new --window-size=390` 的视口会被窗口最小宽度顶到 730px。
+
 ## 部署
 
 仓库自带 [`.github/workflows/pages.yml`](../.github/workflows/pages.yml)：推送到 `main` 且 `website/` 有改动时，自动把这套静态文件发布到 GitHub Pages（`https://sunanang.github.io/jiadi/`）。也可以把 `website/` 整个目录拖到任意静态托管（Cloudflare Pages / Vercel / 自己的 NAS 上都行），不需要构建步骤。

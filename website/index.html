@@ -5,11 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>家底 · 家庭资产台账</title>
 <meta name="description" content="家底是一款简约的家庭总账。没有一笔笔的收入支出，只有固定周期的资金盘点：这个月家里有多少钱，一眼看得见它怎么涨。零依赖、全本地存储、开源。" />
-<meta name="theme-color" content="#0F1318" />
+<meta name="theme-color" content="#0F1318" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#F5F7FA" media="(prefers-color-scheme: light)" />
+<link rel="canonical" href="https://sunanang.github.io/jiadi/" />
 <link rel="icon" href="assets/icon.png" />
 <meta property="og:title" content="家底 · 家庭资产台账" />
 <meta property="og:description" content="不记流水、不做预算、不连银行。只按固定周期盘点家庭资金，直观看见净值怎么涨。" />
-<meta property="og:image" content="assets/home-dark.png" />
+<meta property="og:url" content="https://sunanang.github.io/jiadi/" />
+<meta property="og:site_name" content="家底" />
+<meta property="og:image" content="https://sunanang.github.io/jiadi/assets/home-dark.png" />
+<meta property="og:image:alt" content="家底首页：总资产减总负债等于净资产，下方为近 12 月净值趋势" />
+<meta name="twitter:card" content="summary_large_image" />
 <meta property="og:type" content="website" />
 <style>
   *{box-sizing:border-box}
@@ -21,6 +27,7 @@
     --asset:#6EA3D2; --debt:#D97757; --up:#E08B6A; --down:#4FBE8E;
     --solid:#DCE6F1; --on-solid:#101720; --solid-hover:#C6D4E4;
     --code-bg:#131920; --code-line:rgba(255,255,255,.08);
+    --ring:rgba(255,255,255,.18);
     --shadow:0 1px 2px rgba(0,0,0,.5);
     --shadow-lg:0 24px 60px -32px rgba(0,0,0,.9);
     --r:14px; --r-sm:10px;
@@ -32,11 +39,12 @@
       color-scheme:light;
       --bg:#F5F7FA; --card:#FFFFFF; --raised:#EDF1F6; --raised-2:#F7F9FC;
       --line:rgba(31,58,95,.10); --line-2:rgba(31,58,95,.18);
-      --ink:#1F3A5F; --ink-2:#5A6B80; --mut:#8794A5;
+      --ink:#1F3A5F; --ink-2:#4E5F75; --mut:#5B6B7E;
       --asset:#4A7BA7; --debt:#B4553F; --up:#B4553F; --down:#2E7D5B;
       --solid:#1F3A5F; --on-solid:#FFFFFF; --solid-hover:#182F4D;
       --code-bg:#F0F3F8; --code-line:rgba(31,58,95,.12);
       --shadow:0 1px 2px rgba(31,58,95,.08);
+      --ring:rgba(31,58,95,.16);
       --shadow-lg:0 24px 60px -36px rgba(22,40,63,.55);
     }
   }
@@ -49,21 +57,38 @@
   .num{font-family:var(--num);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   :focus-visible{outline:2px solid var(--asset);outline-offset:3px;border-radius:6px}
   .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  .skip{position:absolute;left:-9999px;top:0;z-index:30;background:var(--card);color:var(--ink);border:1px solid var(--line-2);border-radius:8px;padding:9px 16px;font-size:14px}
+  .skip:focus{left:16px;top:12px}
 
   /* 顶栏 */
-  .top{border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(140%) blur(8px);position:sticky;top:0;z-index:10}
+  .top{border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:10}
+  @supports (background:color-mix(in srgb,#fff 50%,transparent)){
+    .top{background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(140%) blur(8px)}
+  }
   .top .wrap{display:flex;align-items:center;gap:20px;height:62px}
-  .brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:600;font-size:16px}
-  .brand img{width:26px;height:26px;border-radius:7px;display:block}
+  .brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:600;font-size:16px;flex:0 0 auto}
+  .brand img{width:26px;height:26px;border-radius:7px;display:block;box-shadow:0 0 0 1px var(--ring)}
   .brand:hover{text-decoration:none}
   .brand span b{font-weight:600}
   .brand span i{font-style:normal;color:var(--mut);font-weight:400;font-size:13px;margin-left:8px}
   .nav{display:flex;gap:22px;margin-left:auto;font-size:14px}
-  .nav a{color:var(--ink-2)}
+  .nav a{color:var(--ink-2);white-space:nowrap}
   .nav a:hover{color:var(--ink);text-decoration:none}
-  .nav .gh{display:inline-flex;align-items:center;gap:7px;color:var(--ink)}
-  .nav svg{width:16px;height:16px;fill:currentColor}
-  @media (max-width:760px){.nav a:not(.gh){display:none}}
+  .gh{display:inline-flex;align-items:center;gap:7px;color:var(--ink);font-size:14px;flex:0 0 auto;padding-left:20px}
+  .gh:hover{text-decoration:none}
+  .gh svg{width:16px;height:16px;fill:currentColor}
+  @media (max-width:760px){
+    .top .wrap{gap:12px}
+    .brand span i{display:none}
+    .nav{gap:16px;font-size:13.5px;margin-left:auto;min-width:0;flex:1 1 auto;justify-content:flex-end;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+    .nav::-webkit-scrollbar{display:none}
+    .gh{padding-left:12px;gap:0}
+    .gh span{display:none}
+  }
+  @media (max-width:600px){
+    .nav a.opt{display:none}
+    .nav{gap:14px;font-size:13px}
+  }
 
   /* 首屏 */
   .hero{padding:72px 0 40px}
@@ -110,7 +135,8 @@
   }
 
   /* 通用小节 */
-  section{padding:64px 0;border-top:1px solid var(--line)}
+  section{padding:64px 0;border-top:1px solid var(--line);scroll-margin-top:78px}
+  main:target,section:target{scroll-margin-top:78px}
   .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:10px}
   .sec-head h2{font-size:24px;font-weight:620}
   .sec-head span{font-size:13px;color:var(--mut);letter-spacing:.08em;text-transform:uppercase}
@@ -123,7 +149,7 @@
   .panel ul{margin:0;padding-left:18px;color:var(--ink-2);font-size:15px}
   .panel li{margin:8px 0}
   .panel.dim{background:var(--raised-2)}
-  .panel.dim h3{color:var(--mut)}
+  .panel.dim h3{color:var(--ink-2)}
   .panel.own{border-color:color-mix(in srgb,var(--asset) 40%,var(--line))}
   .panel.own h3{color:var(--ink)}
   .panel.own h3::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--asset)}
@@ -184,27 +210,28 @@
   details p{margin:0 0 16px;color:var(--ink-2);font-size:14.5px}
 
   /* 页脚 */
-  footer{border-top:1px solid var(--line);padding:40px 0 56px;color:var(--mut);font-size:13.5px}
+  footer{border-top:1px solid var(--line);padding:40px 0 56px;color:var(--ink-2);font-size:13.5px}
   footer .wrap{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center}
   footer .links{display:flex;gap:20px;margin-left:auto}
   footer a{color:var(--ink-2)}
 </style>
 </head>
 <body>
+<a class="skip" href="#why">跳到正文</a>
 
 <header class="top">
   <div class="wrap">
     <a class="brand" href="#top"><img src="assets/icon.png" alt="家底" /><span><b>家底</b><i>家庭资产台账</i></span></a>
-    <nav class="nav">
-      <a href="#why">为什么不记流水</a>
+    <nav class="nav" aria-label="页面导航">
+      <a href="#why" class="opt">为什么不记流水</a>
       <a href="#ui">界面</a>
       <a href="#install">安装</a>
       <a href="#faq">常见问题</a>
-      <a class="gh" href="https://github.com/Sunanang/jiadi">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-        GitHub
-      </a>
     </nav>
+    <a class="gh" href="https://github.com/Sunanang/jiadi" aria-label="GitHub 仓库">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      <span>GitHub</span>
+    </a>
   </div>
 </header>
 
@@ -236,7 +263,7 @@
             <stop offset="0%" class="lc-stop-a" />
             <stop offset="100%" class="lc-stop-b" />
           </linearGradient></defs>
-          <path class="lc-line" d="M0 74 L48 71 L96 66 L144 60 L192 55 L240 47 L288 38 L336 33 L384 30 L432 22 L480 14" fill="none" stroke-width="2" stroke-linecap="round" />
+          <path class="lc-line" vector-effect="non-scaling-stroke" d="M0 74 L48 71 L96 66 L144 60 L192 55 L240 47 L288 38 L336 33 L384 30 L432 22 L480 14" fill="none" stroke-width="2" stroke-linecap="round" />
           <path d="M0 74 L48 71 L96 66 L144 60 L192 55 L240 47 L288 38 L336 33 L384 30 L432 22 L480 14 L480 96 L0 96 Z" fill="url(#lcArea)" />
           <circle class="lc-dot" cx="480" cy="14" r="3.5" />
         </svg>
