@@ -1,0 +1,12 @@
+services:
+  jiadi:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - jiadi-data:/app/data
+    restart: unless-stopped
+    init: true
+
+volumes:
+  jiadi-data:

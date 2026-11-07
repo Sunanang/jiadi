@@ -1,0 +1,14 @@
+{
+  ".url": {
+    "jiadi.main": {
+      "title": "家底",
+      "icon": "images/icon_{0}.png",
+      "type": "iframe",
+      "protocol": "",
+      "gatewayPrefix": "/app/jiadi",
+      "gatewaySocket": "app.sock",
+      "url": "/app/jiadi/",
+      "allUsers": true
+    }
+  }
+}

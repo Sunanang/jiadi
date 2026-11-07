@@ -1,0 +1,4 @@
+#!/bin/bash
+set -euo pipefail
+echo "jiadi has no port config; open from fnOS desktop"
+exit 0

@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>家底 · 2026 年 11 月</title>
+<style>
+  *{box-sizing:border-box}
+  :root{
+    /* 暖纸中性色阶 */
+    --paper:#f7f4ee;
+    --card:#fdfbf7;
+    --raised:#efe9df;
+    --ink:#1f1b16;
+    --ink-2:#5e554a;
+    --mut:#7b7266;
+    --line:rgba(31,27,22,.09);
+    --line-2:rgba(31,27,22,.18);
+    /* 强调：印泥朱 */
+    --accent:#9d3b29;
+    --pos:#4f7a3f;
+    --neg:#b4553f;
+
+    --r-card:12px;
+    --r-ctl:8px;
+    --ease:cubic-bezier(.22,1,.36,1);
+
+    --ui:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --serif:"Songti SC","Source Han Serif SC","Noto Serif SC","STSong",Georgia,serif;
+  }
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--ui);
+    font-size:14px;
+    line-height:20px;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------------- 布局 ---------------- */
+  .app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+  .main{
+    padding:24px 32px 32px;
+    min-width:0;
+    max-width:1440px;
+    width:100%;
+  }
+
+  /* ---------------- 侧栏 ---------------- */
+  .sidebar{
+    padding:20px 16px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+    border-right:1px solid var(--line);
+    position:sticky;
+    top:0;
+    align-self:start;
+    height:100vh;
+  }
+  .brand{
+    font-family:var(--serif);
+    font-size:19px;
+    line-height:24px;
+    font-weight:500;
+    padding:0 10px;
+    color:var(--ink);
+  }
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    height:34px;
+    padding:0 10px;
+    border-radius:var(--r-ctl);
+    color:var(--ink-2);
+    font-size:14px;
+    cursor:pointer;
+    border:1px solid transparent;
+    transition:background-color .14s var(--ease),color .14s var(--ease);
+    user-select:none;
+  }
+  .nav-item svg{width:18px;height:18px;flex:none;color:var(--mut)}
+  .nav-item:hover{background:var(--raised);color:var(--ink)}
+  .nav-item.active{
+    background:var(--raised);
+    border-color:var(--line);
+    color:var(--ink);
+    font-weight:500;
+  }
+  .nav-item.active svg{color:var(--ink-2)}
+  .nav-sep{height:1px;background:var(--line);margin:12px 10px}
+  .sidebar-foot{
+    margin-top:auto;
+    padding:0 10px;
+    font-size:12px;
+    line-height:16px;
+    color:var(--mut);
+  }
+
+  /* ---------------- 页头 ---------------- */
+  .page-head{
+    display:flex;
+    align-items:baseline;
+    gap:16px;
+    min-height:56px;
+    padding-bottom:4px;
+  }
+  .page-head h1{
+    font-family:var(--serif);
+    font-size:28px;
+    line-height:32px;
+    font-weight:500;
+    margin:0;
+  }
+  .head-meta{
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:12px;
+    line-height:16px;
+    color:var(--mut);
+    font-variant-numeric:tabular-nums;
+  }
+  .status{display:inline-flex;align-items:center;gap:6px}
+  .status i{width:6px;height:6px;border-radius:50%;background:var(--pos)}
+  .dot-sep{color:var(--line-2)}
+
+  /* ---------------- 卡片 ---------------- */
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--r-card);
+  }
+  .card-head{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:20px 24px 0;
+  }
+  .card-head h2{
+    font-size:14px;
+    line-height:20px;
+    font-weight:500;
+    margin:0;
+    color:var(--ink);
+  }
+  .card-head .meta{
+    margin-left:auto;
+    font-size:12px;
+    line-height:16px;
+    color:var(--mut);
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* ---------------- 资产合计行 ---------------- */
+  .balance{
+    margin-top:20px;
+    padding:24px;
+    display:flex;
+    align-items:flex-start;
+    gap:24px;
+    flex-wrap:wrap;
+  }
+  .b-cell{flex:0 1 auto;min-width:0}
+  .b-label{font-size:12px;line-height:16px;color:var(--mut)}
+  .b-num{
+    font-family:var(--serif);
+    font-variant-numeric:tabular-nums;
+    font-size:32px;
+    line-height:40px;
+    font-weight:500;
+    margin-top:8px;
+    white-space:nowrap;
+  }
+  .b-num span{font-size:15px;line-height:20px;font-weight:400;color:var(--ink-2);margin-left:4px}
+  .b-note{font-size:12.5px;line-height:18px;color:var(--mut);margin-top:6px;font-variant-numeric:tabular-nums}
+  .b-op{
+    font-size:20px;
+    line-height:40px;
+    color:#b3a898;
+    align-self:flex-start;
+    margin-top:24px;
+  }
+  .b-cell.net .b-num{font-size:40px;line-height:44px}
+  .b-cell.net .b-num span{font-size:16px}
+  /* 账簿「合计」双规线 */
+  .rule-double{margin-top:10px;width:100%;min-width:112px;max-width:200px}
+  .rule-double i{display:block;height:1px;background:var(--ink);opacity:.55}
+  .rule-double i + i{margin-top:3px;opacity:.3}
+  .b-cell.net .b-note{color:var(--ink-2)}
+  .b-cell.net .up{color:var(--pos);font-weight:500}
+  .b-meta{
+    margin-left:auto;
+    padding-left:24px;
+    border-left:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    font-size:12.5px;
+    line-height:18px;
+    color:var(--mut);
+    font-variant-numeric:tabular-nums;
+    align-self:stretch;
+    justify-content:center;
+    min-width:140px;
+  }
+  .b-meta div{display:flex;justify-content:space-between;gap:16px}
+  .b-meta b{font-weight:500;color:var(--ink-2)}
+
+  /* ---------------- 走势图 ---------------- */
+  .chart-card{margin-top:16px;padding-bottom:12px}
+  .tools{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .seg{display:inline-flex;gap:2px}
+  .seg button{
+    border:1px solid transparent;
+    background:transparent;
+    font:inherit;
+    font-size:12px;
+    line-height:16px;
+    color:var(--mut);
+    padding:5px 10px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background-color .14s var(--ease),color .14s var(--ease),border-color .14s var(--ease);
+  }
+  .seg button:hover{background:var(--raised);color:var(--ink)}
+  .seg button.on{background:var(--raised);border-color:var(--line);color:var(--ink);font-weight:500}
+  .link-btn{
+    border:0;background:none;font:inherit;font-size:12px;line-height:16px;
+    color:var(--ink-2);padding:5px 8px;border-radius:6px;cursor:pointer;
+    transition:background-color .14s var(--ease),color .14s var(--ease);
+  }
+  .link-btn:hover{background:var(--raised);color:var(--ink)}
+  .legend{display:flex;align-items:center;gap:20px;padding:12px 24px 0;font-size:12px;line-height:16px;color:var(--mut)}
+  .legend .k{display:inline-flex;align-items:center;gap:8px}
+  .legend .sw{width:14px;height:2px;border-radius:1px;display:inline-block}
+  .legend .sw.dash{height:0;border-top:2px dashed var(--neg);background:none}
+  .chart-wrap{position:relative;margin:8px 12px 0}
+  .chart-wrap svg{display:block;width:100%;overflow:visible}
+  .tick{font-size:11px;fill:#8b8272;font-variant-numeric:tabular-nums}
+  .grid-line{stroke:#e7e1d6;stroke-width:1;stroke-dasharray:2 4}
+  .xl{font-size:11px;fill:#8b8272;font-variant-numeric:tabular-nums}
+  .lbl-last{font-family:var(--serif);font-size:13px;fill:#1f1b16;font-weight:500}
+  .tip{
+    position:absolute;pointer-events:none;opacity:0;
+    transform:translate(-50%,-118%);
+    background:#26211c;color:#f7f4ee;
+    padding:8px 10px;border-radius:6px;
+    font-size:12px;line-height:18px;white-space:nowrap;
+    transition:opacity .16s var(--ease);
+    z-index:5;
+  }
+  .tip .th{color:#b3a898;font-size:11px;line-height:16px}
+  .tip .row{display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
+  .tip .row i{width:6px;height:6px;border-radius:50%;flex:none}
+  .tip .row span{margin-left:12px;font-weight:500}
+
+  /* ---------------- 下方两栏 ---------------- */
+  .split{
+    display:grid;
+    grid-template-columns:384px minmax(0,1fr);
+    gap:16px;
+    margin-top:16px;
+    align-items:stretch;
+  }
+  .panel{padding-bottom:8px;display:flex;flex-direction:column}
+  .ring-wrap{
+    position:relative;
+    flex:1 1 auto;
+    min-height:212px;
+    margin:12px 16px 8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .share-ring{width:216px;height:216px;display:block;overflow:visible}
+  .share-ring .track{fill:none;stroke:var(--raised);stroke-width:12}
+  .share-ring .arc{
+    fill:none;
+    stroke-width:12;
+    stroke-linecap:round;
+    transition:opacity .16s var(--ease);
+  }
+  .share-ring .arc.dim{opacity:.22}
+  .ring-center{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    display:flex;flex-direction:column;align-items:center;
+    pointer-events:none;text-align:center;
+  }
+  .ring-center .rc-val{
+    font-family:var(--serif);font-size:30px;line-height:34px;font-weight:500;
+    color:var(--ink);font-variant-numeric:tabular-nums;
+  }
+  .ring-center .rc-val span{font-size:14px;line-height:18px;color:var(--ink-2);margin-left:3px}
+  .ring-center .rc-cap{font-size:11.5px;line-height:16px;color:var(--mut);margin-top:4px}
+
+  .rows{padding:8px 24px 0}
+  .row{
+    display:grid;
+    align-items:center;
+    gap:12px;
+    height:40px;
+    border-bottom:1px solid var(--line);
+    font-size:13px;
+  }
+  .rows .row:last-child{border-bottom:0}
+  .row.people{grid-template-columns:14px minmax(0,1fr) 44px 64px}
+  .row.cat{grid-template-columns:64px minmax(0,1fr) 72px 44px}
+  .row .sw-dot{width:8px;height:8px;border-radius:50%}
+  .row .name{color:var(--ink-2)}
+  .row .pct{color:var(--mut);text-align:right;font-variant-numeric:tabular-nums;font-size:12px}
+  .row .amt{
+    text-align:right;color:var(--ink);font-variant-numeric:tabular-nums;
+    font-family:var(--serif);font-size:14px;
+  }
+  .row .amt em{font-style:normal;font-size:11px;color:var(--mut);margin-left:2px;font-family:var(--ui)}
+  .row.total{border-bottom:0;border-top:1px solid var(--line-2);font-weight:500}
+  .row.total .name{color:var(--ink)}
+  .row.total .amt{font-weight:500}
+  .row.people{transition:opacity .14s var(--ease)}
+  .row.people.dim{opacity:.4}
+  .track{height:4px;border-radius:2px;background:var(--raised);overflow:hidden}
+  .track i{display:block;height:100%;border-radius:2px;background:#a8967c}
+  .track.debt i{background:var(--neg);opacity:.75}
+  .rows-sub{
+    margin:16px 24px 0;
+    padding-top:12px;
+    border-top:1px solid var(--line-2);
+    font-size:12px;
+    line-height:16px;
+    color:var(--mut);
+  }
+
+
+  /* ---------------- 净资产构成桥 ---------------- */
+  .wf-card{margin-top:16px;padding-bottom:0;display:flex;flex-direction:column}
+  .wf-wrap{position:relative;margin:12px 16px 0}
+  .wf-wrap svg{display:block;width:100%;overflow:visible}
+  .wf-grid{stroke:#eee8dd;stroke-width:1;stroke-dasharray:2 4}
+  .wf-tick{font-size:11px;fill:#8b8272;font-variant-numeric:tabular-nums}
+  .wf-xlabel{font-size:12px;fill:#7b7266}
+  .wf-xlabel.total{fill:#1f1b16;font-weight:500}
+  .wf-val{font-family:var(--serif);font-size:12.5px;fill:#1f1b16;font-variant-numeric:tabular-nums}
+  .wf-val.down{fill:#9c4b39}
+  .wf-conn{stroke:#bfb4a1;stroke-width:1;stroke-dasharray:2 3}
+  .wf-strip{
+    display:flex;gap:32px;flex-wrap:wrap;
+    margin-top:auto;padding:16px 24px;
+    border-top:1px solid var(--line);
+    font-size:12.5px;line-height:18px;color:var(--mut);
+  }
+  .wf-strip div{display:flex;align-items:baseline;gap:8px}
+  .wf-strip b{font-weight:500;color:var(--ink-2);font-variant-numeric:tabular-nums}
+
+  /* ---------------- 账户明细 ---------------- */
+  .detail-card{margin-top:16px;padding-bottom:0}
+  .row.acct{display:flex;align-items:center;gap:12px}
+  .row.acct .name{flex:0 0 300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row.acct .cat-tag{flex:0 0 84px}
+  .row.acct .owner{flex:0 0 60px}
+  .row.acct .amt{flex:0 0 96px;margin-left:auto}
+  .row.acct .chg{flex:0 0 76px}
+  .row.acct.head{height:32px;border-bottom:1px solid var(--line-2)}
+  .row.acct.head span{font-size:12px;color:var(--mut);font-family:var(--ui);font-weight:400}
+  .row.acct .cat-tag,.row.acct .owner{font-size:12px;color:var(--mut)}
+  .row.acct .chg{font-size:12px;text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+  .row.acct .chg.up{color:var(--pos)}
+  .row.acct:last-child{border-bottom:0}
+  .card-link{
+    display:block;width:100%;margin:0;
+    padding:13px 24px;
+    border:0;border-top:1px solid var(--line);
+    background:none;font:inherit;font-size:12.5px;line-height:18px;
+    color:var(--ink-2);text-align:left;cursor:pointer;
+    border-radius:0 0 var(--r-card) var(--r-card);
+    transition:background-color .14s var(--ease);
+  }
+  .card-link:hover{background:var(--raised)}
+
+  /* ---------------- 页脚 ---------------- */
+  .page-foot{
+    margin-top:16px;
+    padding:16px 0 0;
+    border-top:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    gap:12px;
+    font-size:12.5px;
+    line-height:18px;
+    color:var(--mut);
+    font-variant-numeric:tabular-nums;
+  }
+  .btn-primary{
+    margin-left:auto;
+    border:1px solid var(--accent);
+    background:var(--accent);
+    color:#fdfbf7;
+    font:inherit;
+    font-size:13px;
+    line-height:18px;
+    font-weight:500;
+    padding:9px 16px;
+    border-radius:var(--r-ctl);
+    cursor:pointer;
+    transition:background-color .14s var(--ease),border-color .14s var(--ease),transform .1s var(--ease);
+  }
+  .btn-primary:hover{background:#8a3323;border-color:#8a3323}
+  .btn-primary:active{transform:scale(.98)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* ---------------- 自适应 ---------------- */
+  @media (max-width:1180px){
+    .split{grid-template-columns:minmax(0,1fr)}
+    .b-meta{
+      border-left:0;padding-left:0;margin-left:0;width:100%;
+      flex-direction:row;gap:24px;justify-content:flex-start;
+      border-top:1px solid var(--line);padding-top:12px;
+    }
+    .b-meta div{justify-content:flex-start;gap:8px}
+  }
+  @media (max-width:900px){
+    .app{grid-template-columns:minmax(0,1fr)}
+    .sidebar{
+      position:static;height:auto;flex-direction:row;align-items:center;
+      gap:16px;padding:12px 16px;border-right:0;border-bottom:1px solid var(--line);
+      overflow-x:auto;max-width:100vw;
+    }
+    .brand{padding:0;font-size:17px;flex:none}
+    .nav{flex-direction:row;gap:2px}
+    .nav-item{white-space:nowrap;flex:none}
+    .nav-sep,.sidebar-foot{display:none}
+    .main{padding:16px 16px 24px}
+    .page-head h1{font-size:24px;line-height:28px}
+    .balance{padding:20px;gap:16px}
+    .b-cell{flex:1 1 140px}
+    .b-op{display:none}
+    .b-num{font-size:26px;line-height:32px}
+    .b-cell.net .b-num{font-size:32px;line-height:36px}
+    .card-head{padding:16px 16px 0}
+    .legend{padding:12px 16px 0;gap:14px}
+    .rows{padding:8px 16px 0}
+    .row.cat{grid-template-columns:56px minmax(0,1fr) 68px 40px;gap:8px}
+    .ring-wrap{min-height:190px;margin:12px 12px 8px}
+    .share-ring{width:184px;height:184px}
+    .rows-sub{margin:12px 16px 0}
+    .row.acct{gap:8px}
+    .row.acct .name{flex:1 1 auto}
+    .row.acct .cat-tag,.row.acct .owner{display:none}
+    .row.acct .amt{flex:0 0 84px}
+    .wf-strip{gap:16px 24px;padding:12px 16px}
+    .card-link{padding:12px 16px}
+  }
+  @media (max-width:640px){
+    .b-cell{flex:1 1 100%}
+    .b-note{white-space:normal}
+    .ring-wrap{min-height:176px}
+    .share-ring{width:168px;height:168px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">家底</div>
+    <nav class="nav">
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.4 12 3.6l8 6.8V20a1 1 0 0 1-1 1h-4.4v-6.2H9.4V21H5a1 1 0 0 1-1-1z"/></svg>
+        首页
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 16.5 9 11l3.4 3.4L20.5 6.4"/><path d="M15.6 6.4h4.9v4.9"/></svg>
+        趋势
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.2" cy="8.4" r="3.2"/><path d="M3.6 19.4c.5-3 2.8-4.8 5.6-4.8s5.1 1.8 5.6 4.8"/><path d="M16.2 5.6a3 3 0 0 1 0 5.6"/><path d="M17.4 14.9c2 .5 3.3 2 3.7 4.3"/></svg>
+        分人
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.6 6.6H20.4M8.6 12H20.4M8.6 17.4H20.4"/><circle cx="4.6" cy="6.6" r="1" fill="currentColor" stroke="none"/><circle cx="4.6" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="4.6" cy="17.4" r="1" fill="currentColor" stroke="none"/></svg>
+        明细
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="4.4" width="16.8" height="15.2" rx="3"/><path d="M3.6 9.6h16.8M9.6 13.6h4.8"/></svg>
+        盘点
+      </div>
+      <div class="nav-sep"></div>
+      <div class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 3.2v2.1M12 18.7v2.1M4.8 12H2.7M21.3 12h-2.1M6.9 6.9 5.4 5.4M18.6 18.6l-1.5-1.5M17.1 6.9l1.5-1.5M5.4 18.6l1.5-1.5"/></svg>
+        设置
+      </div>
+    </nav>
+    <div class="sidebar-foot">共 14 个账户</div>
+  </aside>
+
+  <main class="main">
+
+    <header class="page-head">
+      <h1>2026 年 11 月</h1>
+      <div class="head-meta">
+        <span class="status"><i></i>已盘点</span>
+        <span class="dot-sep">·</span>
+        <span>最近盘点 2026-11-05</span>
+      </div>
+    </header>
+
+    <!-- 资产负债合计 -->
+    <section class="card balance">
+      <div class="b-cell">
+        <div class="b-label">总资产</div>
+        <div class="b-num">213.6<span>万</span></div>
+      </div>
+      <div class="b-op">−</div>
+      <div class="b-cell">
+        <div class="b-label">总负债</div>
+        <div class="b-num">85.0<span>万</span></div>
+      </div>
+      <div class="b-op">=</div>
+      <div class="b-cell net">
+        <div class="b-label">净资产</div>
+        <div class="b-num">128.6<span>万</span></div>
+        <div class="rule-double"><i></i><i></i></div>
+        <div class="b-note">较上月 <span class="up">+2.4 万</span> · +1.9%</div>
+      </div>
+      <div class="b-meta">
+        <div><span>负债率</span><b>39.8%</b></div>
+        <div><span>近 12 个月</span><b>+16.4 万</b></div>
+      </div>
+    </section>
+
+    <!-- 走势 -->
+    <section class="card chart-card">
+      <div class="card-head">
+        <h2>近 12 个月走势</h2>
+        <div class="tools">
+          <div class="seg" id="rangeSeg">
+            <button data-range="3">3M</button>
+            <button class="on" data-range="12">12M</button>
+            <button data-range="0">全部</button>
+          </div>
+          <button class="link-btn" id="exportBtn">导出 CSV</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span class="k"><i class="sw" style="background:#1f1b16"></i>净资产</span>
+        <span class="k"><i class="sw" style="background:#7a6f5e"></i>总资产</span>
+        <span class="k"><i class="sw dash"></i>总负债</span>
+      </div>
+      <div class="chart-wrap" id="chartWrap">
+        <svg id="chart" role="img" aria-label="近 12 个月资产走势"></svg>
+        <div class="tip" id="tip"></div>
+      </div>
+    </section>
+
+    <!-- 净资产构成 -->
+    <section class="card wf-card">
+      <div class="card-head">
+        <h2>净资产构成</h2>
+        <span class="meta">按类别逐项累计 · 合计 128.6 万</span>
+      </div>
+      <div class="wf-wrap" id="wfWrap">
+        <svg id="waterfall" role="img" aria-label="净资产构成：房子 94.0、存款 64.1、投资 42.7、现金 12.8，减去房贷 78.0、消费贷 7.0，得净资产 128.6 万"></svg>
+      </div>
+      <div class="wf-strip">
+        <div><span>房子占资产</span><b>44.0%</b></div>
+        <div><span>房贷占负债</span><b>91.8%</b></div>
+        <div><span>净资产占资产</span><b>60.2%</b></div>
+        <div><span>存款与投资</span><b>106.8 万</b></div>
+      </div>
+    </section>
+
+    <div class="split">
+      <!-- 按人分布 -->
+      <section class="card panel">
+        <div class="card-head">
+          <h2>按人分布</h2>
+          <span class="meta">占净资产 128.6 万</span>
+        </div>
+        <div class="ring-wrap">
+          <svg class="share-ring" viewBox="0 0 240 240" role="img" aria-label="净资产按人分布：我 42%，配偶 28%，长子 12%，共同 18%">
+            <circle class="track" cx="120" cy="120" r="92"/>
+            <g id="shareArcs" transform="rotate(-90 120 120)"></g>
+          </svg>
+          <div class="ring-center">
+            <div class="rc-val" id="rcVal">128.6<span>万</span></div>
+            <div class="rc-cap" id="rcCap">按人合计</div>
+          </div>
+        </div>
+        <div class="rows" id="pLegend">
+          <div class="row people" data-idx="0">
+            <span class="sw-dot" style="background:#a8472f"></span>
+            <span class="name">我</span>
+            <span class="pct">42%</span>
+            <span class="amt">54.0<em>万</em></span>
+          </div>
+          <div class="row people" data-idx="1">
+            <span class="sw-dot" style="background:#3f6455"></span>
+            <span class="name">配偶</span>
+            <span class="pct">28%</span>
+            <span class="amt">36.0<em>万</em></span>
+          </div>
+          <div class="row people" data-idx="2">
+            <span class="sw-dot" style="background:#b98a2e"></span>
+            <span class="name">长子</span>
+            <span class="pct">12%</span>
+            <span class="amt">15.4<em>万</em></span>
+          </div>
+          <div class="row people" data-idx="3">
+            <span class="sw-dot" style="background:#46627e"></span>
+            <span class="name">共同</span>
+            <span class="pct">18%</span>
+            <span class="amt">23.2<em>万</em></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 按类分布 -->
+      <section class="card panel">
+        <div class="card-head">
+          <h2>按类分布</h2>
+          <span class="meta">占资产 213.6 万</span>
+        </div>
+        <div class="rows" style="padding-top:12px">
+          <div class="row cat">
+            <span class="name">现金</span>
+            <span class="track"><i style="width:13.6%"></i></span>
+            <span class="amt">12.8<em>万</em></span>
+            <span class="pct">6%</span>
+          </div>
+          <div class="row cat">
+            <span class="name">存款</span>
+            <span class="track"><i style="width:68.2%"></i></span>
+            <span class="amt">64.1<em>万</em></span>
+            <span class="pct">30%</span>
+          </div>
+          <div class="row cat">
+            <span class="name">投资</span>
+            <span class="track"><i style="width:45.4%"></i></span>
+            <span class="amt">42.7<em>万</em></span>
+            <span class="pct">20%</span>
+          </div>
+          <div class="row cat">
+            <span class="name">固定资产</span>
+            <span class="track"><i style="width:100%"></i></span>
+            <span class="amt">94.0<em>万</em></span>
+            <span class="pct">44%</span>
+          </div>
+          <div class="row cat total">
+            <span class="name">合计</span>
+            <span></span>
+            <span class="amt">213.6<em>万</em></span>
+            <span class="pct">100%</span>
+          </div>
+        </div>
+        <div class="rows-sub">负债 · 反向示意</div>
+        <div class="rows" style="padding-top:0">
+          <div class="row cat">
+            <span class="name">房贷</span>
+            <span class="track debt"><i style="width:100%"></i></span>
+            <span class="amt">78.0<em>万</em></span>
+            <span class="pct">92%</span>
+          </div>
+          <div class="row cat">
+            <span class="name">消费贷</span>
+            <span class="track debt"><i style="width:9%"></i></span>
+            <span class="amt">7.0<em>万</em></span>
+            <span class="pct">8%</span>
+          </div>
+          <div class="row cat total">
+            <span class="name">合计</span>
+            <span></span>
+            <span class="amt">85.0<em>万</em></span>
+            <span class="pct">100%</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 账户明细 -->
+    <section class="card detail-card">
+      <div class="card-head">
+        <h2>账户明细</h2>
+        <span class="meta">截至 2026-11-05 · 变动为近 30 天</span>
+      </div>
+      <div class="rows" style="padding-top:12px">
+          <div class="row acct head"><span class="name">账户</span><span class="cat-tag">类别</span><span class="owner">归属</span><span class="amt">余额</span><span class="chg">近 30 天</span></div>
+          <div class="row acct">
+            <span class="name">招商银行 · 储蓄卡</span>
+            <span class="cat-tag">存款</span>
+            <span class="owner">我</span>
+            <span class="amt">38.4<em>万</em></span>
+            <span class="chg up">+1.2</span>
+          </div>
+          <div class="row acct">
+            <span class="name">建设银行 · 工资卡</span>
+            <span class="cat-tag">存款</span>
+            <span class="owner">我</span>
+            <span class="amt">25.7<em>万</em></span>
+            <span class="chg up">+0.8</span>
+          </div>
+          <div class="row acct">
+            <span class="name">沪深 300 指数基金</span>
+            <span class="cat-tag">投资</span>
+            <span class="owner">我</span>
+            <span class="amt">26.5<em>万</em></span>
+            <span class="chg up">+0.6</span>
+          </div>
+          <div class="row acct">
+            <span class="name">公积金账户</span>
+            <span class="cat-tag">投资</span>
+            <span class="owner">配偶</span>
+            <span class="amt">16.2<em>万</em></span>
+            <span class="chg up">+0.2</span>
+          </div>
+          <div class="row acct">
+            <span class="name">支付宝余额</span>
+            <span class="cat-tag">现金</span>
+            <span class="owner">配偶</span>
+            <span class="amt">9.2<em>万</em></span>
+            <span class="chg up">+0.3</span>
+          </div>
+          <div class="row acct">
+            <span class="name">微信零钱</span>
+            <span class="cat-tag">现金</span>
+            <span class="owner">共同</span>
+            <span class="amt">3.6<em>万</em></span>
+            <span class="chg ">−0.1</span>
+          </div>
+          <div class="row acct">
+            <span class="name">自住房</span>
+            <span class="cat-tag">固定资产</span>
+            <span class="owner">共同</span>
+            <span class="amt">94.0<em>万</em></span>
+            <span class="chg ">—</span>
+          </div>
+          <div class="row acct">
+            <span class="name">建行房贷</span>
+            <span class="cat-tag">负债</span>
+            <span class="owner">共同</span>
+            <span class="amt">78.0<em>万</em></span>
+            <span class="chg ">−0.3</span>
+          </div>
+          <div class="row acct">
+            <span class="name">信用卡分期</span>
+            <span class="cat-tag">负债</span>
+            <span class="owner">我</span>
+            <span class="amt">7.0<em>万</em></span>
+            <span class="chg ">−0.1</span>
+          </div>
+      </div>
+      <button class="card-link">查看全部 14 个账户</button>
+    </section>
+
+    <footer class="page-foot">
+      <span>14 个账户</span>
+      <span class="dot-sep">·</span>
+      <span>0 个待补</span>
+      <span class="dot-sep">·</span>
+      <span>最近盘点 2026-11-05</span>
+      <button class="btn-primary">去盘点</button>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+(function(){
+  const DATA = {
+    labels: ['12','1','2','3','4','5','6','7','8','9','10','11'],
+    net:    [112.2,115.0,116.5,117.4,118.9,119.9,120.9,121.9,123.5,125.0,126.8,128.6],
+    assets: [199.4,201.8,202.9,203.6,204.8,205.6,206.4,207.2,208.6,210.1,211.8,213.6],
+    debt:   [87.2,86.8,86.4,86.2,85.9,85.7,85.5,85.3,85.1,85.1,85.0,85.0]
+  };
+  const DATES = DATA.labels.map((_,i)=> i===0 ? '2025-12' : '2026-' + String(i).padStart(2,'0'));
+  const TICKS = [220,185,150,115,80];
+  const COLORS = { net:'#1f1b16', assets:'#7a6f5e', debt:'#b4553f' };
+
+  const svg  = document.getElementById('chart');
+  const wrap = document.getElementById('chartWrap');
+  const tip  = document.getElementById('tip');
+  let range = 12;
+  let geom = null;
+
+  function smooth(pts){
+    if(pts.length < 2) return '';
+    let d = 'M' + pts[0].x + ',' + pts[0].y;
+    for(let i=0;i<pts.length-1;i++){
+      const p0 = pts[i-1] || pts[i], p1 = pts[i], p2 = pts[i+1], p3 = pts[i+2] || p2;
+      const t = 0.16;
+      d += ' C' + (p1.x + (p2.x-p0.x)*t) + ',' + (p1.y + (p2.y-p0.y)*t)
+         + ' '  + (p2.x - (p3.x-p1.x)*t) + ',' + (p2.y - (p3.y-p1.y)*t)
+         + ' '  + p2.x + ',' + p2.y;
+    }
+    return d;
+  }
+
+  function draw(){
+    const w = Math.max(360, wrap.clientWidth);
+    const h = w < 640 ? 224 : 264;
+    const pad = { l: 44, r: 36, t: 16, b: 32 };
+    const innerW = w - pad.l - pad.r;
+    const innerH = h - pad.t - pad.b;
+
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+
+    const total = DATA.labels.length;
+    const start = range === 3 ? total - 3 : 0;
+    const idx = [];
+    for(let i=start;i<total;i++) idx.push(i);
+
+    const Y = v => pad.t + (220 - v) / (220 - 80) * innerH;
+    const X = i => pad.l + (idx.indexOf(i) / Math.max(1, idx.length - 1)) * innerW;
+
+    let g = '<defs><linearGradient id="areaNet" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="#1f1b16" stop-opacity=".07"/>'
+      + '<stop offset="100%" stop-color="#1f1b16" stop-opacity="0"/></linearGradient></defs>';
+
+    TICKS.forEach(t=>{
+      const y = Y(t);
+      g += '<line class="grid-line" x1="'+pad.l+'" y1="'+y+'" x2="'+(w-pad.r)+'" y2="'+y+'"/>';
+      g += '<text class="tick" x="'+(pad.l-10)+'" y="'+(y+4)+'" text-anchor="end">'+t+'</text>';
+    });
+
+    const netPts = idx.map(i => ({x:X(i), y:Y(DATA.net[i])}));
+    const areaD = smooth(netPts) + ' L' + netPts[netPts.length-1].x + ',' + (h-pad.b)
+                + ' L' + netPts[0].x + ',' + (h-pad.b) + ' Z';
+    g += '<path d="'+areaD+'" fill="url(#areaNet)"/>';
+
+    const series = [
+      { key:'assets', color:COLORS.assets, width:1.5, dash:'' },
+      { key:'debt',   color:COLORS.debt,   width:1.5, dash:'5 5' },
+      { key:'net',    color:COLORS.net,    width:2,   dash:'' }
+    ];
+    series.forEach(s=>{
+      const pts = idx.map(i => ({x:X(i), y:Y(DATA[s.key][i])}));
+      g += '<path d="'+smooth(pts)+'" fill="none" stroke="'+s.color+'" stroke-width="'+s.width+'"'
+        + (s.dash ? ' stroke-dasharray="'+s.dash+'"' : '')
+        + ' stroke-linecap="round"/>';
+      pts.forEach(p=>{
+        g += '<circle cx="'+p.x+'" cy="'+p.y+'" r="2.4" fill="'+s.color+'" stroke="#fdfbf7" stroke-width="1.5"/>';
+      });
+    });
+
+    idx.forEach(i=>{
+      g += '<text class="xl" x="'+X(i)+'" y="'+(h-pad.b+20)+'" text-anchor="middle">'+DATA.labels[i]+'</text>';
+    });
+
+    const last = netPts[netPts.length-1];
+    g += '<text class="lbl-last" x="'+(last.x-2)+'" y="'+(last.y-12)+'" text-anchor="end">128.6</text>';
+
+    g += '<g id="hoverG"></g>';
+    g += '<rect id="hit" x="'+pad.l+'" y="0" width="'+innerW+'" height="'+h+'" fill="transparent" style="cursor:crosshair"/>';
+
+    svg.innerHTML = g;
+    geom = { w, h, pad, X, Y, idx, innerW };
+
+    const hit = svg.querySelector('#hit');
+    hit.addEventListener('pointermove', onMove);
+    hit.addEventListener('pointerleave', onLeave);
+  }
+
+  function onMove(e){
+    if(!geom) return;
+    const r = svg.getBoundingClientRect();
+    const scale = geom.w / r.width;
+    const x = (e.clientX - r.left) * scale;
+
+    let best = geom.idx[0], bestD = Infinity;
+    geom.idx.forEach(i=>{
+      const d = Math.abs(geom.X(i) - x);
+      if(d < bestD){ bestD = d; best = i; }
+    });
+
+    const hg = svg.querySelector('#hoverG');
+    if(!hg) return;
+    const px = geom.X(best);
+    let s = '<line x1="'+px+'" y1="'+geom.pad.t+'" x2="'+px+'" y2="'+(geom.h-geom.pad.b)+'" stroke="#cfc5b4" stroke-width="1" stroke-dasharray="2 4"/>';
+    ['net','assets','debt'].forEach(k=>{
+      s += '<circle cx="'+px+'" cy="'+geom.Y(DATA[k][best])+'" r="4" fill="#fdfbf7" stroke="'+COLORS[k]+'" stroke-width="1.5"/>';
+    });
+    hg.innerHTML = s;
+
+    tip.innerHTML = '<div class="th">' + DATES[best] + ' 月末</div>'
+      + row('净资产', DATA.net[best], COLORS.net)
+      + row('总资产', DATA.assets[best], COLORS.assets)
+      + row('总负债', DATA.debt[best], COLORS.debt);
+
+    const left = Math.min(Math.max(px / scale, 64), r.width - 64);
+    tip.style.left = left + 'px';
+    tip.style.top = (geom.Y(DATA.net[best]) / scale) + 'px';
+    tip.style.opacity = 1;
+  }
+  function row(name, v, c){
+    return '<div class="row"><i style="background:'+c+'"></i>'+name+'<span>'+v.toFixed(1)+' 万</span></div>';
+  }
+  function onLeave(){
+    const hg = svg.querySelector('#hoverG');
+    if(hg) hg.innerHTML = '';
+    tip.style.opacity = 0;
+  }
+
+  document.querySelectorAll('#rangeSeg button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      document.querySelectorAll('#rangeSeg button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      range = Number(b.dataset.range);
+      draw();
+    });
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const rows = [['月份','净资产(万)','总资产(万)','总负债(万)']];
+    DATA.labels.forEach((l,i)=> rows.push([ DATES[i] + '-01', DATA.net[i], DATA.assets[i], DATA.debt[i] ]));
+    const csv = '\ufeff' + rows.map(r=>r.join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+    a.download = '家底-近12个月走势.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
+  });
+
+  draw();
+  if(window.ResizeObserver){
+    let t;
+    new ResizeObserver(()=>{ clearTimeout(t); t = setTimeout(draw, 90); }).observe(wrap);
+  } else {
+    window.addEventListener('resize', draw);
+  }
+})();
+</script>
+
+<script>
+/* 按人分布：平面细环（静态，无动画） */
+(function(){
+  const PEOPLE = [
+    { name:'我',   pct:42, amt:'54.0', color:'#a8472f' },
+    { name:'配偶', pct:28, amt:'36.0', color:'#3f6455' },
+    { name:'长子', pct:12, amt:'15.4', color:'#b98a2e' },
+    { name:'共同', pct:18, amt:'23.2', color:'#46627e' }
+  ];
+  const R = 92;
+  const C = 2 * Math.PI * R;
+  const GAP = 18;                    // 段间留白（沿弧长，px）
+
+  const g = document.getElementById('shareArcs');
+  if(!g) return;
+
+  const arcs = [];
+  let acc = 0;
+  PEOPLE.forEach((p, i)=>{
+    const len  = p.pct / 100 * C;
+    const dash = Math.max(1, len - GAP);
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('class', 'arc');
+    c.setAttribute('cx', 120);
+    c.setAttribute('cy', 120);
+    c.setAttribute('r', R);
+    c.setAttribute('stroke', p.color);
+    c.setAttribute('stroke-dasharray', dash + ' ' + (C - dash));
+    c.setAttribute('stroke-dashoffset', -(acc + GAP / 2));
+    g.appendChild(c);
+    arcs.push(c);
+    acc += len;
+  });
+
+  const rcVal = document.getElementById('rcVal');
+  const rcCap = document.getElementById('rcCap');
+  const rows  = Array.from(document.querySelectorAll('#pLegend .row'));
+
+  function setHi(i){
+    const on = (i === null || isNaN(i)) ? null : i;
+    rows.forEach((el,k)=> el.classList.toggle('dim', on !== null && k !== on));
+    arcs.forEach((a,k)=> a.classList.toggle('dim', on !== null && k !== on));
+    if(on === null){
+      rcVal.innerHTML = '128.6<span>万</span>';
+      rcCap.textContent = '按人合计';
+    }else{
+      const p = PEOPLE[on];
+      rcVal.innerHTML = p.amt + '<span>万</span>';
+      rcCap.textContent = p.name + ' · ' + p.pct + '%';
+    }
+  }
+  rows.forEach(el=>{
+    const i = Number(el.dataset.idx);
+    el.addEventListener('mouseenter', ()=>setHi(i));
+    el.addEventListener('mouseleave', ()=>setHi(null));
+    el.addEventListener('touchstart', ()=>setHi(i), {passive:true});
+  });
+})();
+</script>
+<script>
+/* 净资产构成：竖向瀑布（静态） */
+(function(){
+  const WF = [
+    { label:'房子',   from:0,     to:94.0,  kind:'up'   },
+    { label:'存款',   from:94.0,  to:158.1, kind:'up'   },
+    { label:'投资',   from:158.1, to:200.8, kind:'up'   },
+    { label:'现金',   from:200.8, to:213.6, kind:'up'   },
+    { label:'房贷',   from:135.6, to:213.6, kind:'down' },
+    { label:'消费贷', from:128.6, to:135.6, kind:'down' },
+    { label:'净资产', from:0,     to:128.6, kind:'total'}
+  ];
+  const MAX  = 220;
+  const TICK = [0, 50, 100, 150, 200];
+  const svg  = document.getElementById('waterfall');
+  const wrap = document.getElementById('wfWrap');
+  if(!svg || !wrap) return;
+
+  function draw(){
+    const w = Math.max(320, wrap.clientWidth);
+    const h = w < 640 ? 236 : 268;
+    const pad = { l: 34, r: 10, t: 26, b: 34 };
+    const innerW = w - pad.l - pad.r;
+    const innerH = h - pad.t - pad.b;
+
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+
+    const Y    = v => pad.t + (MAX - v) / MAX * innerH;
+    const step = innerW / WF.length;
+    const barW = Math.min(46, step * 0.44);
+    const CX   = i => pad.l + step * i + step / 2;
+
+    let g = '';
+    TICK.forEach(t=>{
+      const y = Y(t);
+      g += '<line class="wf-grid" x1="' + pad.l + '" y1="' + y + '" x2="' + (w - pad.r) + '" y2="' + y + '"/>';
+      g += '<text class="wf-tick" x="' + (pad.l - 8) + '" y="' + (y + 4) + '" text-anchor="end">' + t + '</text>';
+    });
+    g += '<line x1="' + pad.l + '" y1="' + Y(0) + '" x2="' + (w - pad.r) + '" y2="' + Y(0) + '" stroke="#dcd3c4" stroke-width="1"/>';
+
+    const run = [];
+    WF.forEach(d=>{
+      const x1 = CX(WF.indexOf(d)) - barW / 2;
+      const up = Math.max(d.from, d.to), dn = Math.min(d.from, d.to);
+      const yTop = Y(up), hgt = Math.max(6, Y(dn) - Y(up));
+      const fill = d.kind === 'down' ? '#b4553f' : d.kind === 'total' ? '#1f1b16' : '#b3a68e';
+      const op   = d.kind === 'down' ? 0.85 : 1;
+      g += '<rect x="' + x1 + '" y="' + yTop + '" width="' + barW + '" height="' + hgt
+         + '" rx="2" fill="' + fill + '" opacity="' + op + '"/>';
+      const v = d.kind === 'down' ? '-' + (d.from - d.to).toFixed(1) : d.to.toFixed(1);
+      g += '<text class="wf-val' + (d.kind === 'down' ? ' down' : '') + '" x="' + CX(WF.indexOf(d))
+         + '" y="' + (yTop - 8) + '" text-anchor="middle">' + v + '</text>';
+      run.push(d.kind === 'down' ? d.from : d.to);
+    });
+
+    for(let i=0;i<WF.length-1;i++){
+      const y = Y(run[i]);
+      g += '<line class="wf-conn" x1="' + (CX(i) + barW / 2) + '" y1="' + y
+         + '" x2="' + (CX(i + 1) - barW / 2) + '" y2="' + y + '"/>';
+    }
+
+    WF.forEach((d, i)=>{
+      g += '<text class="wf-xlabel' + (d.kind === 'total' ? ' total' : '') + '" x="' + CX(i)
+         + '" y="' + (h - pad.b + 20) + '" text-anchor="middle">' + d.label + '</text>';
+    });
+
+    svg.innerHTML = g;
+  }
+
+  draw();
+  if(window.ResizeObserver){
+    let t;
+    new ResizeObserver(()=>{ clearTimeout(t); t = setTimeout(draw, 90); }).observe(wrap);
+  } else {
+    window.addEventListener('resize', draw);
+  }
+})();
+</script>
+</body>
+</html>

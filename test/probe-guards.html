@@ -1,0 +1,58 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>
+<div id="out">未运行</div>
+<script>
+fetch('seed.json').then(r=>r.json()).then(seed=>{
+  localStorage.setItem('jiadi.data.v1', JSON.stringify(seed));
+  const f=document.createElement('iframe');
+  f.id='f'; f.src='http://127.0.0.1:8899/jiadi-ui.html';
+  f.style.cssText='width:1200px;height:900px;border:0';
+  f.onload=()=>setTimeout(run,1800);
+  document.body.appendChild(f);
+});
+window.run=function(){
+  const w=document.getElementById('f').contentWindow, d=w.document, log=[], errs=[];
+  const ev = c => { try { return w.eval(c); } catch(e){ errs.push(e.message); return 'ERR'; } };
+  w.addEventListener('error', e=>errs.push(e.message));
+  const db=()=>JSON.parse(localStorage.getItem('jiadi.data.v1')||'{}');
+
+  // ── 场景1：「仅当天」设置下，残留的历史日期必须被拦
+  ev("S.view='checkin'; S.checkin={step:1,values:{},jumpsOk:false,date:'2026-08-20'}; renderCurrent();");
+  const beforeDay=ev('resolveCheckinDay()');
+  ev("PREF.backdate='仅当天'; savePrefs();");
+  const afterDay=ev('resolveCheckinDay()');
+  log.push('设「仅当天」前='+beforeDay+' 后='+afterDay+(afterDay!=='2026-08-20'?' ✓拦住':' ✗没拦住'));
+  ev("PREF.backdate='允许（需确认）'; savePrefs();");
+
+  // ── 场景2：未来日期
+  ev("S.checkin.date='2027-01-01';");
+  log.push('未来日期→'+ev('resolveCheckinDay()')+(ev('resolveCheckinDay()')!=='2027-01-01'?' ✓拦住':' ✗没拦'));
+  ev("S.checkin.date='2026-10-15';");
+
+  // ── 场景3：同月重复提交（dupCheckin=覆盖并提示）
+  const snapBefore=db().snapshots.length;
+  ev("S.view='checkin'; S.checkin.step=1; renderCurrent();");
+  d.querySelector('#nextStep').click();
+  setTimeout(()=>{
+    if(d.querySelector('#jumpOk')){d.querySelector('#jumpOk').checked=true;d.querySelector('#jumpOk').dispatchEvent(new w.Event('change',{bubbles:true}));}
+    const sb=d.querySelector('#submitStep');
+    if(sb&&!sb.disabled) sb.click();
+    setTimeout(()=>{
+      // 可能弹 modal 确认覆盖
+      const modalOk=d.querySelector('#modalOk');
+      if(modalOk){ log.push('弹出覆盖确认 ✓'); modalOk.click(); }
+      setTimeout(()=>{
+        const s2=db().snapshots;
+        log.push('重复提交后快照='+s2.map(x=>x.month).sort().join(',')+' (共'+s2.length+'条)');
+
+        // ── 场景4：撤销
+        ev("S.view='checkin'; S.checkin.step=3; S.checkin.undo={before:JSON.parse(localStorage.getItem('jiadi.data.v1')),after:JSON.stringify(dataState())}; renderCurrent();");
+        try{ ev('undoCheckin()'); setTimeout(()=>{
+          log.push('撤销后快照='+db().snapshots.map(x=>x.month).sort().join(','));
+          log.push('错误数='+errs.length+(errs.length?' '+errs[0]:''));
+          document.getElementById('out').textContent='RESULT::'+log.join(' | ');
+        },600); }catch(e){ log.push('撤销抛错 '+e.message); document.getElementById('out').textContent='RESULT::'+log.join(' | '); }
+      },900);
+    },700);
+  },700);
+};
+</script></body></html>

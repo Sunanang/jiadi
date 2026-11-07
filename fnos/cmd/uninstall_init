@@ -1,0 +1,41 @@
+#!/bin/bash
+# 卸载前执行。fnOS 卸载时会清空 @appdata/<app> 下它管理的 data/runtime 等目录，
+# 所以「保留数据」不能只靠 uninstall_callback —— 必须先把账本复制到应用数据目录之外。
+set -u
+VAR_DIR="${TRIM_PKGVAR:-}"
+LEDGER="$VAR_DIR/data/ledger.json"
+
+keep() { printf '%s\n' "$1" >&2; }
+
+[[ -n "$VAR_DIR" && -f "$LEDGER" ]] || { keep "jiadi: 没有找到账本文件，跳过卸载前备份"; exit 0; }
+
+# 备份目录放在卷根下（VAR_DIR 形如 /vol1/@appdata/jiadi），卸载不会碰到
+VOL_ROOT="$(cd "$VAR_DIR/../.." 2>/dev/null && pwd || true)"
+[[ -n "$VOL_ROOT" ]] || VOL_ROOT=/vol1
+KEEP_DIR="${VOL_ROOT}/.jiadi-keep"
+mkdir -p "$KEEP_DIR" 2>/dev/null || { keep "jiadi: 无法创建 $KEEP_DIR，跳过卸载前备份"; exit 0; }
+
+# 卸载脚本一般以 root 运行；备份要能被应用用户（重装后）读到，否则「从备份恢复」等于摆设
+OWNER="$(stat -c '%u:%g' "$VAR_DIR/data" 2>/dev/null || true)"
+[[ -n "$OWNER" ]] && chown "$OWNER" "$KEEP_DIR" 2>/dev/null || true
+chmod 700 "$KEEP_DIR" 2>/dev/null || true
+
+TS="$(date +%Y%m%d-%H%M%S)"
+DEST="$KEEP_DIR/ledger-$TS.json"
+if cp -a "$LEDGER" "$DEST" 2>/dev/null; then
+  [[ -n "$OWNER" ]] && chown "$OWNER" "$DEST" 2>/dev/null || true
+  chmod 600 "$DEST" 2>/dev/null || true
+  # 轮转：按文件名（含时间戳）排序，只留最近 10 份；绝不删刚做的那份。
+  # 不用 ls -t：同一秒内 mtime 精度不够，会把新备份当旧的删掉。
+  TOTAL=$(ls -1 "$KEEP_DIR"/ledger-*.json 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${TOTAL:-0}" -gt 10 ]; then
+    ls -1 "$KEEP_DIR"/ledger-*.json 2>/dev/null | sort | head -n "$((TOTAL-10))" | while read -r f; do
+      [ "$f" = "$DEST" ] && continue
+      rm -f -- "$f"
+    done
+  fi
+  keep "jiadi: 卸载前已把账本备份到 $DEST（重装后可在应用内「导入账本」选它恢复）"
+else
+  keep "jiadi: 卸载前备份失败（$DEST）"
+fi
+exit 0

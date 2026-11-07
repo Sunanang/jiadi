@@ -1,0 +1,66 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>
+<div id="out">未运行</div>
+<script>
+fetch('seed.json').then(r=>r.json()).then(seed=>{
+  localStorage.setItem('jiadi.data.v1', JSON.stringify(seed));
+  const f=document.createElement('iframe');
+  f.id='f'; f.src='http://127.0.0.1:8899/jiadi-ui.html';
+  f.style.cssText='width:1200px;height:900px;border:0';
+  f.onload=()=>setTimeout(run,1800);
+  document.body.appendChild(f);
+});
+window.run=function(){
+  const w=document.getElementById('f').contentWindow, d=w.document;
+  const errs=[], log=[];
+  const ev = c => { try { return w.eval(c); } catch(e){ errs.push('eval:'+e.message); return null; } };
+  w.addEventListener('error', e=>errs.push('JS:'+e.message));
+  const origErr=w.console.error; w.console.error=(...a)=>{errs.push('cerr:'+a.join(' ').slice(0,100));origErr(...a);};
+
+  const views=['home','trend','people','detail','checkin','settings','report'];
+  views.forEach(v=>{
+    try{ ev(`S.view='${v}'; renderCurrent();`);
+      const n=d.querySelectorAll('.app button, .app [role=button], .app .cell-link').length;
+      log.push(`${v}(${n}个可点)`);
+    }catch(e){ errs.push(v+':'+e.message); }
+  });
+
+  // 点击 home 的所有 data-drill / cell-link
+  ev("S.view='home'; renderCurrent();");
+  const drill=[...d.querySelectorAll('#v-home [data-drill], #v-home .cell-link')];
+  drill.slice(0,6).forEach((el,i)=>{ try{ el.click(); ev('closeDrawer()'); }catch(e){ errs.push('drill'+i+':'+e.message); } });
+  log.push('home 钻取 '+Math.min(drill.length,6)+' 次');
+
+  // 明细页筛选/分组
+  ev("S.view='detail'; renderCurrent();");
+  const dbtns=[...d.querySelectorAll('#v-detail button')];
+  dbtns.slice(0,10).forEach((b,i)=>{ try{ b.click(); }catch(e){ errs.push('detail btn'+i+':'+e.message); } });
+  log.push('明细点按钮 '+Math.min(dbtns.length,10)+' 个');
+
+  // 趋势页粒度切换
+  ev("S.view='trend'; renderCurrent();");
+  const tbtns=[...d.querySelectorAll('#v-trend button')];
+  tbtns.slice(0,8).forEach((b,i)=>{ try{ b.click(); }catch(e){ errs.push('trend btn'+i+':'+e.message); } });
+  log.push('趋势点按钮 '+Math.min(tbtns.length,8)+' 个');
+
+  // 设置页开关
+  ev("S.view='settings'; renderCurrent();");
+  const sbtns=[...d.querySelectorAll('#v-settings select, #v-settings input, #v-settings button')];
+  sbtns.slice(0,15).forEach((el,i)=>{ try{ el.click(); }catch(e){ errs.push('set'+i+':'+e.message); } });
+  log.push('设置点控件 '+Math.min(sbtns.length,15)+' 个');
+
+  // 抽屉
+  ev("S.view='home'; renderCurrent();");
+  ['logDrawer()','auditDrawer()','accountDrawer(ACCOUNTS[0].id)'].forEach(fn=>{
+    try{ ev(fn); const on=d.querySelector('#drawer')?.classList.contains('on'); log.push(fn.replace('()','')+'='+(on?'开':'未开')); ev('closeDrawer()'); }
+    catch(e){ errs.push(fn+':'+e.message); }
+  });
+
+  // 隐私遮罩
+  try{ ev("S.privacy=true; applyPrivacy();"); log.push('遮罩开='+!!d.querySelector('.masked, [data-masked]'));
+       ev("S.privacy=false; applyPrivacy();"); }catch(e){ errs.push('privacy:'+e.message); }
+
+  log.push('错误数='+errs.length);
+  if(errs.length) log.push('详情: '+errs.slice(0,5).join(' ;; '));
+  document.getElementById('out').textContent='RESULT::'+log.join(' | ');
+};
+</script></body></html>

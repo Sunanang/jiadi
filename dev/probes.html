@@ -1,0 +1,28 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><div id="out">x</div>
+<iframe id="f" src="/" style="width:1000px;height:650px;border:0"></iframe>
+<script>
+const log=[],sleep=ms=>new Promise(r=>setTimeout(r,ms));
+addEventListener('load',async()=>{
+  const f=document.getElementById('f'); await sleep(2500);
+  let d=f.contentDocument,w=f.contentWindow;
+  try{
+    const h1=(d.querySelector('#connectionGate h1')||{}).textContent||'';
+    log.push('首屏='+h1);
+    if(/锁定/.test(h1)){
+      d.querySelector('#connectionGate form input').value='test1234';
+      d.querySelector('#connectionGate form button').click();
+      await sleep(4000);
+    }
+    d=f.contentDocument;w=f.contentWindow;
+    log.push('解锁后app='+(!d.querySelector('.app')?.hidden));
+    // 应该自动跳到盘点页并恢复草稿
+    await sleep(1500); d=f.contentDocument;
+    const vc=d.querySelector('#v-checkin');
+    const inp=vc?vc.querySelector('input[data-id]'):null;
+    log.push('盘点页='+(vc?'有':'无'));
+    log.push('草稿值='+(inp?inp.value:'无输入框'));
+    log.push('提示='+(vc?(vc.textContent.match(/已恢复[^\n]{0,20}/)||[''])[0]:''));
+  }catch(e){ log.push('ERR '+e.message); }
+  document.getElementById('out').textContent='RESULT::'+log.join(' | ');
+});
+</script></body></html>

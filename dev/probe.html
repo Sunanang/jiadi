@@ -1,0 +1,24 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><div id="out">x</div>
+<iframe id="f" src="/" style="width:1200px;height:900px;border:0"></iframe>
+<script>
+const out=[];
+addEventListener('load',async()=>{
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const f=document.getElementById('f'); await sleep(2900);
+  let d=f.contentDocument,w=f.contentWindow;
+  const g=d.querySelector('#connectionGate');
+  if(g&&g.querySelector('input')){g.querySelector('input').value='test1234';g.querySelector('button').click();await sleep(4000);}
+  w.addEventListener('error',e=>out.push('❌JS:'+e.message+' @'+(e.lineno||'')),true);
+  w.console.log=(...a)=>{ out.push('LOG '+a.map(x=>typeof x==='object'?JSON.stringify(x):String(x)).join(' ')); };
+  w.console.error=(...a)=>{ out.push('ERR '+a.join(' ')); };
+  let code='';
+  try{ code=await (await fetch('/check.js')).text(); out.push('脚本长度='+code.length); }
+  catch(e){ out.push('fetch失败:'+e.message); }
+  if(code){
+    const sc=w.document.createElement('script'); sc.textContent=code;
+    try{ w.document.body.appendChild(sc); out.push('已注入'); }catch(e){ out.push('注入失败:'+e.message); }
+  }
+  await sleep(9000);
+  document.getElementById('out').textContent='RESULT::'+out.join(' || ');
+});
+</script></body></html>

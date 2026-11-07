@@ -1,0 +1,20 @@
+{
+  "name": "jiadi-shared-ledger",
+  "version": "0.5.2",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/server.test.mjs",
+    "test:browser": "node tests/regression.mjs",
+    "test:http": "node tests/http-accept.mjs",
+    "test:shared": "node tests/shared-browser.mjs",
+    "pack": "bash scripts/pack.sh",
+    "pack:fpk": "bash scripts/build-fpk.sh",
+    "pack:zip": "bash scripts/pack.sh",
+    "test:gateway": "node tests/onboarding-gateway.mjs"
+  }
+}

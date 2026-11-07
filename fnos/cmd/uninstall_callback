@@ -1,0 +1,47 @@
+#!/bin/bash
+### Called after the user uninstalls the application.
+# Default: keep ledger data. Only delete when wizard chooses "delete".
+# Compatible with wizard_data_action / WIZARD_DATA_ACTION.
+set -u
+
+log() { printf '%s\n' "$1" >&2; }
+
+remove_path() {
+  local p="$1"
+  [ -z "${p}" ] && return 0
+  [ -e "${p}" ] || return 0
+  rm -rf -- "${p}" 2>/dev/null || log "remove failed: ${p}"
+}
+
+if [[ -n "${TRIM_PKGVAR:-}" ]]; then
+  pid_file="${TRIM_PKGVAR}/runtime/server.pid"
+  if [[ -f "$pid_file" ]]; then
+    pid="$(tr -d '[:space:]' <"$pid_file" || true)"
+    if [[ "$pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$pid" 2>/dev/null; then
+      kill -TERM "$pid" 2>/dev/null || true
+      for _ in 1 2 3 4 5; do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.2
+      done
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+    rm -f "$pid_file"
+  fi
+  rm -f "${TRIM_PKGVAR}/data/server.lock" "${TRIM_PKGVAR}/runtime/app.sock" 2>/dev/null || true
+fi
+
+ACTION="${wizard_data_action:-${WIZARD_DATA_ACTION:-keep}}"
+log "uninstall action=${ACTION}"
+
+VOL_ROOT="$(cd "${TRIM_PKGVAR:-}/../.." 2>/dev/null && pwd || echo /vol1)"
+KEEP_DIR="${VOL_ROOT}/.jiadi-keep"
+if [ "${ACTION}" = "delete" ]; then
+  remove_path "${TRIM_PKGVAR:-}"
+  # 向导文案写的是“删除所有应用数据（不可恢复）”，卸载前的自动备份也必须一并删除
+  remove_path "$KEEP_DIR"
+  log "jiadi app data and uninstall backups deleted"
+else
+  log "keep jiadi app data（注意：fnOS 卸载仍会清空 @appdata 下 data/runtime；卸载前的账本已由 uninstall_init 备份到 <卷根>/.jiadi-keep/）"
+fi
+
+exit 0

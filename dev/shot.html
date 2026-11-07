@@ -1,0 +1,43 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;padding:0;overflow:hidden;background:#fff}
+iframe{border:0;display:block}
+</style></head><body>
+<iframe id="f" src="/"></iframe>
+<script>
+const q=new URLSearchParams(location.search);
+const VIEW=q.get('view')||'home';
+const THEME=q.get('theme')||'dark';
+const W=Number(q.get('w')||1200), H=Number(q.get('h')||900);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const f=document.getElementById('f');
+f.style.width=W+'px'; f.style.height=H+'px';
+addEventListener('load',async()=>{
+  await sleep(2600);
+  let d=f.contentDocument,w=f.contentWindow;
+  w.localStorage.setItem('jiadi.theme',THEME);
+  w.location.reload(); await sleep(3200);
+  d=f.contentDocument; w=f.contentWindow;
+  const g=d.querySelector('#connectionGate');
+  if(g&&g.querySelector('input')&&!g.hidden){
+    g.querySelector('input').value='test1234'; g.querySelector('button').click(); await sleep(3600);
+    d=f.contentDocument; w=f.contentWindow;
+  }
+  if(VIEW==='lock'){ // 主动上锁后截图
+    const lb=d.querySelector('#lockBtn'); if(lb) lb.click();
+    await sleep(1200);
+  } else if(VIEW==='drawer'){
+    [...d.querySelectorAll('.nav-item')].find(x=>x.dataset.view==='detail')?.click();
+    await sleep(600); d=f.contentDocument;
+    d.querySelector('#v-detail [data-acct]')?.click(); await sleep(800);
+  } else if(VIEW==='report'){
+    [...d.querySelectorAll('.nav-item')].find(x=>x.dataset.view==='settings')?.click();
+    await sleep(300); d=f.contentDocument;
+    [...d.querySelectorAll('#v-settings [data-act]')].find(x=>x.dataset.act==='report')?.click();
+    await sleep(900);
+  } else {
+    [...d.querySelectorAll('.nav-item,#tabbar button')].find(x=>x.dataset.view===VIEW)?.click();
+    await sleep(700);
+  }
+  document.title='READY';
+});
+</script></body></html>

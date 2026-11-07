@@ -1,0 +1,41 @@
+[
+  {
+    "stepTitle": "安装家底",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "家底是一个家庭资产盘点本：每月把账户余额填一遍，帮你把「我到底有多少钱」算清楚——不记一笔笔流水，只做固定周期的资金盘点。先设置应用密码：打开家底、解密备份都要用它；忘记后可以在应用里重设，账本数据不受影响。"
+      },
+      {
+        "type": "password",
+        "field": "wizard_app_password",
+        "label": "应用密码（4–8 位，且同时包含字母和数字）",
+        "rules": [
+          {
+            "required": true,
+            "message": "应用密码必填：4–8 位，且同时包含字母和数字"
+          },
+          {
+            "pattern": "^[A-Za-z0-9]{4,8}$",
+            "message": "4–8 位，且同时包含字母和数字"
+          }
+        ]
+      },
+      {
+        "type": "password",
+        "field": "wizard_app_password_confirm",
+        "label": "再输一次",
+        "rules": [
+          {
+            "required": true,
+            "message": "请再输一次应用密码"
+          },
+          {
+            "pattern": "^[A-Za-z0-9]{4,8}$",
+            "message": "4–8 位，且同时包含字母和数字"
+          }
+        ]
+      }
+    ]
+  }
+]

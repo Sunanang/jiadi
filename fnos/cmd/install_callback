@@ -1,0 +1,37 @@
+#!/bin/bash
+set -euo pipefail
+# 家底作为网关微应用安装：不占端口。向导里必须设置应用密码（两个输入框）。
+VAR_DIR="${TRIM_PKGVAR:-}"
+ETC_DIR="${TRIM_PKGETC:-}"
+[[ -n "$VAR_DIR" ]] && mkdir -p "$VAR_DIR/data" "$VAR_DIR/runtime"
+# 数据目录只给应用用户（默认 umask 会给到 755，账本是财务数据）
+[[ -n "$VAR_DIR" ]] && chmod 700 "$VAR_DIR/data" 2>/dev/null || true
+# 目录可能是我们刚建的（root 属主），服务以应用用户运行，属主不对会写不了数据
+VAR_OWNER="$(stat -c '%u:%g' "$VAR_DIR" 2>/dev/null || true)"
+[[ -n "$VAR_OWNER" ]] && chown "$VAR_OWNER" "$VAR_DIR/data" "$VAR_DIR/runtime" 2>/dev/null || true
+[[ -n "$ETC_DIR" ]] && mkdir -p "$ETC_DIR"
+
+pw="${wizard_app_password:-}"
+pw2="${wizard_app_password_confirm:-}"
+
+die() { echo "家底安装中止：$1" >&2; exit 1; }
+
+# 应用密码是账本的唯一门禁：必须设置、必须符合规则、必须两次一致。
+# 任何一条不满足都让安装失败（而不是悄悄跳过），否则用户会以为自己设了密码却没生效。
+[[ -n "$VAR_DIR" ]] || die "拿不到数据目录（TRIM_PKGVAR 为空）"
+[[ -n "$pw"  ]] || die "安装向导里没有填写应用密码（4–8 位，且同时包含字母和数字）"
+[[ -n "$pw2" ]] || die "安装向导里没有填写确认密码"
+[[ "$pw" =~ ^[A-Za-z0-9]{4,8}$ && "$pw" =~ [A-Za-z] && "$pw" =~ [0-9] ]] || die "应用密码格式不符：需 4–8 位，且同时包含字母和数字"
+[[ "$pw" == "$pw2" ]] || die "两次输入的应用密码不一致，请重新安装并再输一次"
+
+# 只落成 data/.pwseed（0600）：加盐哈希由服务端首次启动时生成，随即删除该文件。
+# 任何情况下都不要把密码写进日志/echo。
+( umask 077; printf '%s' "$pw" >"$VAR_DIR/data/.pwseed" )
+chmod 600 "$VAR_DIR/data/.pwseed" 2>/dev/null || true
+# 安装脚本一般以 root 运行、服务以应用用户运行：把 seed 交给 data 目录属主，否则服务读不到（EACCES）
+owner="$(stat -c '%u:%g' "$VAR_DIR/data" 2>/dev/null || true)"
+[[ -n "$owner" ]] && chown "$owner" "$VAR_DIR/data/.pwseed" 2>/dev/null || true
+
+echo "jiadi: 已收到安装向导中的应用密码（两次一致），首次启动时生成本地哈希并删除明文"
+echo "jiadi gateway install ready"
+exit 0

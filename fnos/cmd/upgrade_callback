@@ -1,0 +1,11 @@
+#!/bin/bash
+set -euo pipefail
+VAR_DIR="${TRIM_PKGVAR:-}"
+ETC_DIR="${TRIM_PKGETC:-}"
+[[ -n "$VAR_DIR" ]] && mkdir -p "$VAR_DIR/data" "$VAR_DIR/runtime"
+[[ -n "$VAR_DIR" ]] && chmod 700 "$VAR_DIR/data" 2>/dev/null || true
+VAR_OWNER="$(stat -c '%u:%g' "$VAR_DIR" 2>/dev/null || true)"
+[[ -n "$VAR_OWNER" ]] && chown "$VAR_OWNER" "$VAR_DIR/data" "$VAR_DIR/runtime" 2>/dev/null || true
+[[ -n "$ETC_DIR" ]] && mkdir -p "$ETC_DIR"
+echo "jiadi gateway upgrade ready"
+exit 0

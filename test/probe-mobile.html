@@ -1,0 +1,40 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0">
+<div id="out">未运行</div>
+<script>
+fetch('seed.json').then(r=>r.json()).then(seed=>{
+  seed.snapshots=[{month:'2026-10',date:'2026-10-15',A:1750000,L:0},{month:'2026-11',date:'2026-11-06',A:1923049,L:0}];
+  localStorage.setItem('jiadi.data.v1', JSON.stringify(seed));
+  const f=document.createElement('iframe');
+  f.id='f'; f.src='http://127.0.0.1:8899/jiadi-ui.html';
+  f.style.cssText='width:390px;height:844px;border:0';
+  f.onload=()=>setTimeout(run,3000);
+  document.body.appendChild(f);
+});
+window.run=function(){
+  const w=document.getElementById('f').contentWindow, d=w.document, log=[], errs=[];
+  const ev = c => { try { return w.eval(c); } catch(e){ return 'ERR:'+e.message; } };
+  w.addEventListener('error', e=>errs.push(e.message));
+  ev("S.privacy=false; applyPrivacy();");
+  log.push('视口='+w.innerWidth+' tabbar='+(d.querySelector('.tabbar')?getComputedStyle(d.querySelector('.tabbar')).display:'无'));
+  // 用正确的 show() 切换
+  ['home','trend','people','detail','checkin','settings'].forEach(v=>{
+    ev(`show('${v}')`);
+    const view=d.querySelector('#v-'+v);
+    const vis=view?getComputedStyle(view).display:'缺失';
+    const sw=view?view.scrollWidth:0;
+    log.push(`${v}:${vis==='none'?'未激活':(sw>w.innerWidth+2?'溢出'+sw:'ok('+sw+')')}`);
+  });
+  // 盘点第1步：日期控件真实可见性
+  ev("S.checkin={step:1,values:{},jumpsOk:false,date:'2026-10-15'}; show('checkin');");
+  const inp=d.querySelector('#ckDate'), bar=d.querySelector('.ck-date');
+  if(inp){
+    const r=inp.getBoundingClientRect();
+    log.push('ckDate '+Math.round(r.width)+'x'+Math.round(r.height)+(r.width>50&&r.height>15?' ✓可点':' ✗太小'));
+    log.push('ck-date 行宽='+Math.round(bar.getBoundingClientRect().width));
+    log.push('补记标签='+!!d.querySelector('.ck-date .tag.past'));
+    log.push('回到今天按钮='+!!d.querySelector('#ckToday'));
+  } else log.push('ckDate 缺失');
+  log.push('错误数='+errs.length+(errs.length?' '+errs[0]:''));
+  document.getElementById('out').textContent='RESULT::'+log.join(' | ');
+};
+</script></body></html>
