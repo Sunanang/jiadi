@@ -45,6 +45,7 @@ cp docs/screenshots/01-home-dark.png website/assets/home-dark.png
 | 布局稳定 | 冷启动 t=0.4s 与 t=4s 的 `documentElement.scrollHeight` 必须相同（截图用 padding-top 定比盒子，不靠图片撑高） |
 | 移动导航 | ≤600px 隐藏「为什么不记流水」、≤760px 隐藏 GitHub 文字，其余链接完整可见不被裁切 |
 | 图片 | 滚动到底后每张 `img.complete && naturalWidth > 0`（截图是 `loading="lazy"`，不滚到底量不到） |
+| 图标 | 深色与浅色下都要肉眼可辨——源图是深色方块，必须放在浅色底托里，1px 半透明描边在高分屏上等于没有 |
 | 控制台 | 无 error、无失败请求 |
 | 对比度 | 正文/说明/小标/页脚在深浅两主题下 ≥ 4.5:1（浅色 `--mut:#5B6B7E`、`--ink-2:#4E5F75` 是为此定的） |
 | 结构 | 唯一 `h1`、无重复 `id`、所有 `img` 有 `alt`、`lang="zh-CN"` |
