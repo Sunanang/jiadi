@@ -145,11 +145,19 @@ export async function createLedgerApp({
     if(raw!==null){
       try{
         const password=String(raw).trim();
-        if(disk.vault) console.log('[jiadi] 安装向导里的应用密码未采用：账本已有应用密码');
-        else if(pinRule.test(password)){
+        if(!pinRule.test(password)) console.log('[jiadi] 安装向导里的应用密码格式不符，已忽略；可在应用内设置');
+        else if(!disk.vault){
           await persist({...disk,vault:await makeVault(password)});
           console.log('[jiadi] 已按安装向导设置应用密码（首次打开时直接用它解锁）');
-        }else console.log('[jiadi] 安装向导里的应用密码格式不符，已忽略；可在应用内设置');
+        }else if(await matches(password,disk.vault)){
+          console.log('[jiadi] 安装向导里的应用密码与现有密码一致，无需改动');
+        }else{
+          /* 卸载后重装、而飞牛把应用数据保留下来时，旧账本连同旧密码一起还在。
+             安装向导里让人新设的密码必须以新密码为准，否则用户会以为自己设了密码却只能用旧的。
+             只换密码，账本内容一个字都不动。 */
+          await persist({...disk,vault:await makeVault(password)});
+          console.log('[jiadi] 已按安装向导更新应用密码（数据被保留、账本内容未改动；旧密码已失效）');
+        }
       }catch(e){ console.error('[jiadi] 向导密码落地失败：'+((e&&e.message)||e)); }
       finally{ try{await unlink(seedPath);}catch(_){} }
     }else if(readErr){

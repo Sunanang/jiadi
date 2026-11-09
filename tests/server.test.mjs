@@ -58,6 +58,27 @@ test('gateway prefix without trailing slash redirects instead of serving a page 
   assert.equal((await f.request('GET','/',undefined,{},trim)).status,200,'非网关前缀模式（Docker/本地）的根路径不能被重定向');
   assert.equal((await f.request('GET','/app/jiadi/api/session',undefined,{},trim)).status,200,'重定向不能吃掉 API');
 });
+test('reinstall that keeps the data adopts the password typed in the install wizard and retires the old one',async t=>{
+  const f=await fixture(t);
+  const first=await f.login('abc1',true);
+  // 先制造一点真实账本内容，验证换密码不会碰数据
+  const saved=await f.request('PUT','/api/ledger',{revision:0,ledger:ledger(1234)},first);
+  assert.equal(saved.status,200,JSON.stringify(saved.data));
+  const before=(await f.request('GET','/api/ledger',undefined,first)).data;
+  // 重装：安装向导把新密码写进 data/.pwseed
+  await writeFile(join(f.dataDir,'.pwseed'),'xyz9');
+  await f.restart();
+  const oldPassword=await f.request('POST','/api/login',{password:'abc1'});
+  assert.notEqual(oldPassword.status,200,'重装后旧密码必须失效，否则用户会以为自己设了新密码');
+  const login=await f.request('POST','/api/login',{password:'xyz9'});
+  assert.equal(login.status,200,'安装向导里新设的密码必须有效');
+  const client={cookie:login.headers['Set-Cookie'].split(';')[0]};
+  client.csrf=(await f.request('GET','/api/session',undefined,client)).data.csrf;
+  const after=(await f.request('GET','/api/ledger',undefined,client)).data;
+  assert.deepEqual(after.ledger,before.ledger,'换密码不能动账本内容');
+  assert.equal(after.revision,before.revision,'换密码不该产生新的账本版本');
+  await assert.rejects(readFile(join(f.dataDir,'.pwseed')),'seed 用完必须删除');
+});
 test('gateway trust uses X-Trim identity without a ledger login password',async t=>{
   const f=await fixture(t,{trustGateway:true,gatewayPrefix:'/app/jiadi'});
   const trim={'x-trim-userid':'7','x-trim-username':'Lando','x-trim-isadmin':'true'};
@@ -251,12 +272,20 @@ test('an app password collected by the install wizard is turned into a vault onc
   assert.ok(disk.vault&&/^[a-f0-9]{32}$/.test(disk.vault.salt)&&/^[a-f0-9]{64}$/.test(disk.vault.hash),'应生成合法 vault');
   assert.equal(JSON.stringify(disk).includes('abc1'),false,'明文密码不能落到 ledger.json');
   await assert.rejects(readFile(join(dataDir,'.pwseed'),'utf8'),/ENOENT/,'seed 用完必须删除');
-  // 已有的 vault 不能被 seed 覆盖；seed 也要清掉
+  // 再放一个「相同密码」的 seed：不该产生任何改动，seed 也要清掉
+  await writeFile(join(dataDir,'.pwseed'),'abc1',{mode:0o600});
+  await app.close(); app=null;
+  app=await createLedgerApp({dataDir,trustGateway:true});
+  const diskSame=JSON.parse(await readFile(join(dataDir,'ledger.json'),'utf8'));
+  assert.equal(diskSame.vault.hash,disk.vault.hash,'密码没变时不该重写 vault');
+  await assert.rejects(readFile(join(dataDir,'.pwseed'),'utf8'),/ENOENT/,'残留 seed 必须清掉');
+  // 重装时安装向导新设的密码必须生效（旧密码作废）：见「reinstall that keeps the data…」用例
   await writeFile(join(dataDir,'.pwseed'),'zz99',{mode:0o600});
   await app.close(); app=null;
   app=await createLedgerApp({dataDir,trustGateway:true});
   const disk2=JSON.parse(await readFile(join(dataDir,'ledger.json'),'utf8'));
-  assert.equal(disk2.vault.hash,disk.vault.hash,'已有 vault 不应被向导密码覆盖');
+  assert.notEqual(disk2.vault.hash,disk.vault.hash,'换密码时 vault 必须更新，否则新密码无效');
+  assert.equal(disk2.revision,diskSame.revision,'换密码不应改变账本版本');
   await assert.rejects(readFile(join(dataDir,'.pwseed'),'utf8'),/ENOENT/,'残留 seed 必须清掉');
 });
 test('an install-wizard password that breaks the rule is ignored and never leaves a seed behind',async t=>{
