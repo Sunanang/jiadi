@@ -19,3 +19,8 @@ dist/
 
 # 系统文件
 .DS_Store
+
+# EdgeOne Makers 构建产物与本地凭据（deploy 生成，勿入库）
+website/.edgeone/
+website/.env
+.edgeone/
