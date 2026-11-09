@@ -218,6 +218,31 @@
   footer .wrap{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center}
   footer .links{display:flex;gap:20px;margin-left:auto}
   footer a{color:var(--ink-2)}
+
+  /* 下载块：本站直连（EdgeOne 国内节点），不跳 GitHub */
+  .dl{border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden;margin:0 0 26px}
+  .dl-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--raised-2);font-size:12px;color:var(--mut)}
+  .dl-head b{color:var(--ink);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+  .dl-hist{margin-left:auto;color:var(--ink-2)}
+  .dl-hist:hover{color:var(--solid)}
+  .dl-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:16px;align-items:center;padding:15px 18px;border-bottom:1px solid var(--line)}
+  .dl-row:last-of-type{border-bottom:0}
+  .dl-name{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .dl-name b{font-size:14px;font-weight:600}
+  .dl-name code{font-size:12px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dl-size{font-size:12px;color:var(--mut);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .dl-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 18px;border-radius:9px;background:var(--solid);color:var(--on-solid);font-size:13px;font-weight:600;transition:background .16s}
+  .dl-btn:hover{background:var(--solid-hover)}
+  .dl-sha{border-top:1px solid var(--line)}
+  .dl-sha summary{padding:11px 18px;font-size:12px;color:var(--mut);cursor:pointer;list-style:none}
+  .dl-sha summary::-webkit-details-marker{display:none}
+  .dl-sha pre{margin:0;padding:0 18px 14px;font-size:11.5px;line-height:1.9;color:var(--ink-2);overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .dl-note{padding:13px 18px;border-top:1px solid var(--line);font-size:13px;color:var(--mut);line-height:1.75;background:var(--raised-2)}
+  .dl-note a{color:var(--ink-2);text-decoration:underline;text-underline-offset:2px}
+  @media (max-width:640px){
+    .dl-row{grid-template-columns:minmax(0,1fr) auto;gap:10px 12px}
+    .dl-row .dl-btn{grid-column:1 / -1;width:100%}
+  }
 </style>
 </head>
 <body>
@@ -344,10 +369,31 @@
     <div class="wrap">
       <div class="sec-head"><span>Install</span><h2>三种装法，选一种</h2></div>
       <p class="sec-desc">同一个服务不要重复启动多个进程指向不同数据目录。</p>
+      <div class="dl">
+        <div class="dl-head">
+          <b><span data-ver>v0.5.3</span> · <span data-date>2026-11-07</span></b>
+          <span>最新版 · 本站直连下载</span>
+          <a class="dl-hist" href="https://github.com/Sunanang/jiadi/releases">历史版本 →</a>
+        </div>
+        <div class="dl-row">
+          <div class="dl-name">
+            <b>飞牛应用中心包（含 fnOS 适配）</b>
+            <code data-name="all">jiadi-0.5.3-fnos-all.fpk</code>
+          </div>
+          <span class="dl-size" data-size="all">215 KB</span>
+          <a class="dl-btn" href="downloads/jiadi-0.5.3-fnos-all.fpk" download data-dl="all">下载</a>
+        </div>
+        <details class="dl-sha">
+          <summary>SHA256 校验值</summary>
+          <pre data-sha>0c775aaf461a5f1110675fded380371f644f50e618a4b91972ff512adb0b6bf6  jiadi-0.5.3-fnos-all.fpk</pre>
+        </details>
+        <p class="dl-note">文件就在这个站点上，走 EdgeOne 国内节点，不用翻 GitHub；想找更早的版本去 <a href="https://github.com/Sunanang/jiadi/releases">GitHub Releases</a>。装完在应用中心「手动安装」，或在下面用一条命令装。</p>
+      </div>
+
       <div class="install">
         <div class="step">
           <h3><i>1</i>飞牛 NAS 微应用（推荐）</h3>
-          <p>不占独立端口，走飞牛统一网关 <code>/app/jiadi</code>，用 NAS 统一登录。前置：应用中心已装 Node.js v22。到 <a href="https://github.com/Sunanang/jiadi/releases/latest">Releases</a> 下载 <code>jiadi-&lt;版本&gt;-fnos-all.fpk</code>，应用中心「手动安装」。</p>
+          <p>不占独立端口，走飞牛统一网关 <code>/app/jiadi</code>，用 NAS 统一登录。前置：应用中心已装 Node.js v22。用上面的按钮下载 <code>jiadi-&lt;版本&gt;-fnos-all.fpk</code>（或到 <a href="https://github.com/Sunanang/jiadi/releases/latest">Releases</a> 取历史版本），应用中心「手动安装」。</p>
           <pre>trim-cli --profile home --host &lt;NAS&gt; app install-fpk jiadi-&lt;版本&gt;-fnos-all.fpk \
   --volume-id &lt;卷ID&gt; --custom-parameters '[]' --yes</pre>
           <p class="note">已装旧端口版的，先在应用中心卸载（保留数据）再装新包。</p>
@@ -463,6 +509,28 @@ document.addEventListener('click', function (e) {
   else location.hash = id;
   try { a.blur(); } catch (err) {}
 });
+
+/* 下载块水合：有 version.json 就用它，没有就沿用 HTML 里的静态值（照样能下） */
+(function () {
+  var fmt = function (b) { return b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB'; };
+  if (!window.fetch) return;
+  fetch('downloads/version.json', { cache: 'no-store' }).then(function (r) {
+    return r.ok ? r.json() : null;
+  }).then(function (v) {
+    if (!v || !v.assets || !v.assets.length) return;
+    var a = v.assets[0];
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ver]'), function (e) { e.textContent = v.tag; });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-date]'), function (e) { e.textContent = v.publishedAt; });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-dl]'), function (el) {
+      el.setAttribute('href', 'downloads/' + a.name);
+      if (el.hasAttribute('download')) el.setAttribute('download', a.name);
+    });
+    var n = document.querySelector('[data-name="all"]'); if (n) n.textContent = a.name;
+    var sz = document.querySelector('[data-size="all"]'); if (sz) sz.textContent = fmt(a.size);
+    var sha = document.querySelector('[data-sha]');
+    if (sha) sha.textContent = v.assets.map(function (x) { return x.sha256 + '  ' + x.name; }).join('\n');
+  }).catch(function () {});
+})();
 </script>
 </body>
 </html>
