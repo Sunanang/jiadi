@@ -1,7 +1,7 @@
 import {execFileSync, spawn} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import {createServer} from 'node:http';
-import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve, dirname} from 'node:path';
 
@@ -84,7 +84,7 @@ export async function browser(file = resolve('jiadi-ui.html'), fixedDate) {
   return {cdp,evaluate,errors,origin,
     async navigate(url){await cdp.send('Page.navigate',{url});await new Promise(r=>setTimeout(r,100));await ready();},
     async reload(){await cdp.send('Page.reload');await new Promise(r=>setTimeout(r,100));await ready();},
-    async screenshot(path,width=1440,height=1050){await cdp.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<700});await new Promise(r=>setTimeout(r,100));const shot=await cdp.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(path,Buffer.from(shot.data,'base64'));},
+    async screenshot(path,width=1440,height=1050){await mkdir(dirname(path),{recursive:true});await cdp.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<700});await new Promise(r=>setTimeout(r,100));const shot=await cdp.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(path,Buffer.from(shot.data,'base64'));},
     async close(){try{await control.send('Browser.close');}catch{}for(const ws of connections)ws.close();if(chrome.exitCode===null){chrome.kill();await new Promise(r=>chrome.once('exit',r));}await new Promise(r=>server.close(r));await rm(profile,{recursive:true,force:true});}
   };
 }

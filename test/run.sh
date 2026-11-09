@@ -12,6 +12,7 @@ CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 # 每次从源文件重建，并注入 TEST_LOCAL（避免测到旧副本）
 rm -rf "$HERE/build" && mkdir -p "$HERE/build"
 sed 's|<script src="./shared-client.js">|<script>window.JIADI_TEST_LOCAL=1;</script>\n<script src="./shared-client.js">|' "$SRC" > "$HERE/build/jiadi-ui.html"
+# seed.json 可选：自己准备演示数据放进来，绝不要用真实账本
 cp "$HERE"/seed.json "$HERE/build/" 2>/dev/null || true
 cp /tmp/jtest/shared-client.js "$HERE/build/" 2>/dev/null || true
 cp /tmp/jtest/ledger-domain.mjs "$HERE/build/" 2>/dev/null || true
