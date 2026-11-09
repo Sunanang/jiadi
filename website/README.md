@@ -65,7 +65,7 @@ Safari 的原生片段跳转（点 `#id` 链接）**不认 `scroll-margin-top`**
 
 ## 部署
 
-仓库自带 [`.github/workflows/pages.yml`](../.github/workflows/pages.yml)：推送到 `main` 且 `website/` 有改动时，自动把这套静态文件发布到 GitHub Pages（`https://sunanang.github.io/jiadi/`）。也可以把 `website/` 整个目录拖到任意静态托管（Cloudflare Pages / Vercel / 自己的 NAS 上都行），不需要构建步骤。
+仓库自带 [`.github/workflows/pages.yml`](../.github/workflows/pages.yml)：推送到 `main` 且 `website/` 有改动时，自动把这套静态文件发布到 GitHub Pages（`https://www.jiadi.lndo.top/`）。也可以把 `website/` 整个目录拖到任意静态托管（Cloudflare Pages / Vercel / 自己的 NAS 上都行），不需要构建步骤。
 
 ## 内容维护
 

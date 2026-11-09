@@ -276,7 +276,7 @@
           <a class="btn" href="https://github.com/Sunanang/jiadi/releases/latest">下载安装包</a>
           <a class="btn ghost" href="#install">看安装方式</a>
         </div>
-        <p class="meta">飞牛 NAS 微应用 · Docker · 单文件源码；数据全在你自己的机器上。</p>
+        <p class="meta">飞牛 NAS 微应用 · Docker · 零依赖源码；数据全在你自己的机器上。</p>
       </div>
       <div class="ledger" role="img" aria-label="家底首页等式卡示意：总资产 213.6 万减总负债 85.0 万等于净资产 128.6 万，较上次记录 +33,887，负债率 39.8%">
         <div class="lc-top"><b>本月已盘点</b><span>2026-11</span></div>
@@ -304,7 +304,7 @@
   <section id="why">
     <div class="wrap">
       <div class="sec-head"><span>Why</span><h2>记账软件记流水，家底只盘点</h2></div>
-      <p class="sec-desc">一笔笔记流水，坚持不了三周；一个月盘一次余额，才真的会记满一年。家底把「记什么」这件事压到最小。</p>
+      <p class="sec-desc">一笔一笔地记流水，坚持不了三周；一个月盘一次余额，才真的会记满一年。家底把「记什么」这件事压到最小。</p>
       <div class="compare">
         <div class="panel dim">
           <h3>记账软件</h3>
@@ -329,7 +329,7 @@
         <div class="figure"><b class="num">1</b><span>一份账本，电脑手机共用</span></div>
         <div class="figure"><b class="num">0</b><span>第三方依赖，克隆即运行</span></div>
         <div class="figure"><b class="num">15<span style="font-size:13px"> 分钟</span></b><span>无操作自动上锁</span></div>
-        <div class="figure"><b class="num">AES-256</b><span>导出备份一律加密</span></div>
+        <div class="figure"><b class="num">AES-256-GCM</b><span>导出备份一律加密</span></div>
       </div>
     </div>
   </section>
@@ -337,7 +337,7 @@
   <section id="ui">
     <div class="wrap">
       <div class="sec-head"><span>Interface</span><h2>七个视图，一眼看懂</h2></div>
-      <p class="sec-desc">没有花哨的动效，也没有滚动直播式的图表。深色与浅色都是同一套排版，手机上照着 390px 重排。</p>
+      <p class="sec-desc">没有花哨的动效，也没有滚动直播式的图表。深色与浅色都是同一套排版，窄屏自动改成单列（390px 宽度专门验证过）。</p>
       <div class="shots">
         <figure><a class="zoom" href="assets/people.png" target="_blank" rel="noopener" title="点开看大图"><img src="assets/people.png" width="1440" height="1050" loading="lazy" decoding="async" alt="按人归属：每位成员的净值与占比圆环" /></a><figcaption>按人归属 · 谁占多少</figcaption></figure>
         <figure><a class="zoom" href="assets/detail.png" target="_blank" rel="noopener" title="点开看大图"><img src="assets/detail.png" width="1440" height="1050" loading="lazy" decoding="async" alt="按类明细：现金、存款、投资、固定资产与负债分组" /></a><figcaption>按类明细 · 结构占比</figcaption></figure>
@@ -355,10 +355,10 @@
       <div class="sec-head"><span>Features</span><h2>该有的都有，不该有的不做</h2></div>
       <p class="sec-desc">从 0.3 到 0.5，修的都是同一件事：账本不能坏、数据不能丢、界面不能骗人。</p>
       <div class="grid">
-        <div class="card"><h3>盘点即历史</h3><p>每次填余额自动写进历史，趋势图按月或按年聚合成线，悬停看当月数值。</p></div>
-        <div class="card"><h3>多端一份账本</h3><p>电脑与手机访问同一服务。另一台已更新时，旧页面保存会被拒绝，不会互相覆盖。</p></div>
-        <div class="card"><h3>密码门禁</h3><p>进入账本、解开遮罩、导出备份共用一个应用密码；15 分钟无操作自动上锁，锁定态接口全部拒绝。</p></div>
-        <div class="card"><h3>加密导出</h3><p>JSON 备份、CSV、操作日志、HTML 报告都在服务端加密后下载，明文只能在自己这边还原。</p></div>
+        <div class="card"><h3>盘点即历史</h3><p>每次填余额自动写进历史，趋势图按月、按季或按年聚合成线，悬停看当期数值。</p></div>
+        <div class="card"><h3>多端一份账本</h3><p>电脑与手机访问同一服务。另一台改了会自动同步过来；如果你正在填，就拒绝覆盖并提示先处理当前输入。</p></div>
+        <div class="card"><h3>密码门禁</h3><p>空闲解锁、隐私遮罩、导出备份共用一个应用密码（飞牛模式用 NAS 账号打开应用）；15 分钟无操作自动上锁，锁定后账本与草稿接口一律拒绝。</p></div>
+        <div class="card"><h3>加密导出</h3><p>JSON 备份、CSV、操作日志、HTML 报告都加密后下载，加解密都在你自己那台机器上完成。</p></div>
         <div class="card"><h3>写入不会半截</h3><p>临时文件 + 同步落盘 + 原子替换，断电不会留下半个账本；同一个数据目录只允许一个进程写。</p></div>
         <div class="card"><h3>隐私遮罩</h3><p>一键把金额换成圆点、图表虚化，在别人旁边也能打开看一眼。</p></div>
       </div>
@@ -368,7 +368,7 @@
   <section id="install">
     <div class="wrap">
       <div class="sec-head"><span>Install</span><h2>三种装法，选一种</h2></div>
-      <p class="sec-desc">同一个服务不要重复启动多个进程指向不同数据目录。</p>
+      <p class="sec-desc">一个数据目录只能跑一个进程；也别同时开两个进程指向不同目录，那会变成两份账本。</p>
       <div class="dl">
         <div class="dl-head">
           <b><span data-ver>v0.5.3</span> · <span data-date>2026-11-07</span></b>
@@ -384,16 +384,16 @@
           <a class="dl-btn" href="downloads/jiadi-0.5.3-fnos-all.fpk" download data-dl="all">下载</a>
         </div>
         <details class="dl-sha">
-          <summary>SHA256 校验值</summary>
+          <summary>SHA-256 校验值</summary>
           <pre data-sha>0c775aaf461a5f1110675fded380371f644f50e618a4b91972ff512adb0b6bf6  jiadi-0.5.3-fnos-all.fpk</pre>
         </details>
-        <p class="dl-note">文件就在这个站点上，走 EdgeOne 国内节点，不用翻 GitHub；想找更早的版本去 <a href="https://github.com/Sunanang/jiadi/releases">GitHub Releases</a>。装完在应用中心「手动安装」，或在下面用一条命令装。</p>
+        <p class="dl-note">文件就在这个站点上，国内直连下载，不用翻 GitHub；想找更早的版本去 <a href="https://github.com/Sunanang/jiadi/releases">GitHub Releases</a>。装完在应用中心「手动安装」，或在下面用一条命令装。</p>
       </div>
 
       <div class="install">
         <div class="step">
           <h3><i>1</i>飞牛 NAS 微应用（推荐）</h3>
-          <p>不占独立端口，走飞牛统一网关 <code>/app/jiadi</code>，用 NAS 统一登录。前置：应用中心已装 Node.js v22。用上面的按钮下载 <code>jiadi-&lt;版本&gt;-fnos-all.fpk</code>（或到 <a href="https://github.com/Sunanang/jiadi/releases/latest">Releases</a> 取历史版本），应用中心「手动安装」。</p>
+          <p>不占独立端口，从飞牛应用中心打开，用 NAS 账号登录。前置：应用中心已装 Node.js（v22 及以上）。用上面的按钮下载 <code>jiadi-&lt;版本&gt;-fnos-all.fpk</code>（或到 <a href="https://github.com/Sunanang/jiadi/releases">Releases</a> 下载），应用中心「手动安装」。</p>
           <pre>trim-cli --profile home --host &lt;NAS&gt; app install-fpk jiadi-&lt;版本&gt;-fnos-all.fpk \
   --volume-id &lt;卷ID&gt; --custom-parameters '[]' --yes</pre>
           <p class="note">已装旧端口版的，先在应用中心卸载（保留数据）再装新包。</p>
@@ -420,14 +420,14 @@ npm start   # http://localhost:8080</pre>
   <section id="data">
     <div class="wrap">
       <div class="sec-head"><span>Data</span><h2>数据在你手里，也只有在你手里</h2></div>
-      <p class="sec-desc">没有账号、没有云同步、没有遥测。服务端唯一的账本文件是 <code>data/ledger.json</code>，密码只保存加盐哈希。</p>
+      <p class="sec-desc">没有账号、没有云同步、没有遥测。账本只存 <code>data/ledger.json</code>；导入、清空这类覆盖操作前，会另存一份到数据目录之外的 <code>.jiadi-keep/</code>（最多 20 份）。密码不存明文，只存不可逆校验值。</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>项</th><th>约定</th></tr></thead>
           <tbody>
             <tr><td>存储位置</td><td>源码/Docker 默认项目下 <code>data/</code>；飞牛应用在应用数据目录</td></tr>
             <tr><td>自动备份</td><td><strong>没有</strong>。请自行每月导出一次加密备份，存在服务之外</td></tr>
-            <tr><td>浏览器里</td><td>只存主题、显示偏好、备份提醒日期与引导状态，账本不进 localStorage</td></tr>
+            <tr><td>浏览器里</td><td>只存主题、显示偏好、备份提醒日期、引导状态与一个锁定标记，账本不进 localStorage</td></tr>
             <tr><td>导出加密</td><td>AES-256-GCM 信封，明文只能在「导入 / 解密」里还原</td></tr>
             <tr><td>远程访问</td><td>请用 HTTPS 反向代理或私有网络入口（WireGuard / Tailscale），不要公网裸 HTTP</td></tr>
           </tbody>
@@ -447,11 +447,11 @@ npm start   # http://localhost:8080</pre>
       </details>
       <details>
         <summary>需要连银行吗？数据会上传吗？</summary>
-        <p>不连。不接任何银行、券商或第三方接口，也不会把账本发到任何服务器。所有数据就在你自己那台机器上的一个 <code>ledger.json</code> 里。</p>
+        <p>不连。不接任何银行、券商或第三方接口，也不会把账本发到任何服务器。所有数据就在你自己那台机器上的 <code>data/ledger.json</code> 里。</p>
       </details>
       <details>
         <summary>手机能用吗？</summary>
-        <p>能。手机和电脑访问同一个服务、同一份账本，390px 宽度有专门的布局；飞牛用户可以登录飞牛客户端后从桌面进入，不必记端口。</p>
+        <p>能。手机和电脑访问同一个服务、同一份账本，窄屏有专门布局（390px 宽度验证过）；飞牛用户可以登录飞牛客户端后从桌面进入，不必记端口。</p>
       </details>
       <details>
         <summary>忘记密码怎么办？</summary>
@@ -463,7 +463,7 @@ npm start   # http://localhost:8080</pre>
       </details>
       <details>
         <summary>可以在公网访问吗？</summary>
-        <p>本项目按家庭内网设计，不建议公网裸 HTTP 暴露。需要远程时用 HTTPS 反向代理或私有网络（WireGuard / Tailscale），并保持应用密码开启。</p>
+        <p>本项目按家庭内网设计，不建议公网裸 HTTP 暴露。需要远程时用 HTTPS 反向代理或私有网络（WireGuard / Tailscale），并保持应用密码已设置。</p>
       </details>
     </div>
   </section>

@@ -4,7 +4,7 @@
   <p><strong>不记流水、不做预算、不连银行的家庭总账。</strong></p>
   <p>没有一笔笔的收入支出，只有固定周期的资金盘点：这个月家里有多少钱，一眼看得见它怎么涨。</p>
   <p>
-    <a href="https://sunanang.github.io/jiadi/">官网</a> ·
+    <a href="https://www.jiadi.lndo.top/">官网</a> ·
     <a href="https://github.com/Sunanang/jiadi/releases">获取安装包</a> ·
     <a href="#开始使用">快速开始</a> ·
     <a href="#共享密码与备份">数据与备份</a> ·
@@ -197,7 +197,7 @@ npm run shots          # 用演示数据重新生成 docs/screenshots/
 
 ## 官网
 
-官网源码在 [`website/`](website/)，单文件静态站，零依赖零构建（`index.html` 里内联全部 CSS，无脚本）。推送到 `main` 且 `website/` 有改动时，由 [GitHub Actions](.github/workflows/pages.yml) 发布到 <https://sunanang.github.io/jiadi/>。
+官网源码在 [`website/`](website/)，单文件静态站，零依赖零构建（`index.html` 里内联全部 CSS，无脚本）。推送到 `main` 且 `website/` 有改动时，由 [GitHub Actions](.github/workflows/pages.yml) 发布到 <https://www.jiadi.lndo.top/>。
 
 本地预览：
 
