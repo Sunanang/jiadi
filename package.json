@@ -1,7 +1,7 @@
 {
   "name": "jiadi",
   "description": "家底 · 家庭共享资产台账：不记流水、不做预算、不连银行，只按固定周期盘点家庭资金。",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/Sunanang/jiadi.git" },
   "homepage": "https://github.com/Sunanang/jiadi#readme",
