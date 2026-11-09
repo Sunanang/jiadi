@@ -42,6 +42,22 @@ test('fresh service requires setup/login and never exposes unauthenticated asset
   const state=await f.request('GET','/api/ledger',undefined,client);
   assert.equal(state.data.revision,0);assert.deepEqual(state.data.ledger.accounts,[]);assert.equal(state.data.vault,undefined);
 });
+test('gateway prefix without trailing slash redirects instead of serving a page whose scripts 404',async t=>{
+  const f=await fixture(t,{trustGateway:true,gatewayPrefix:'/app/jiadi'});
+  const trim={'x-trim-userid':'7'};
+  const bare=await f.request('GET','/app/jiadi',undefined,{},trim);
+  assert.equal(bare.status,301,'裸前缀必须重定向，不能直接吐 HTML（否则 ./shared-client.js 会解析到 /app/ 而 404）');
+  assert.equal(bare.headers.Location,'/app/jiadi/');
+  const query=await f.request('GET','/app/jiadi?x=1',undefined,{},trim);
+  assert.equal(query.status,301);
+  assert.equal(query.headers.Location,'/app/jiadi/?x=1','重定向要保留查询串');
+  const page=await f.request('GET','/app/jiadi/',undefined,{},trim);
+  assert.equal(page.status,200);
+  assert.match(page.headers['Content-Type'],/text\/html/);
+  assert.equal((await f.request('GET','/app/jiadi/shared-client.js',undefined,{},trim)).status,200);
+  assert.equal((await f.request('GET','/',undefined,{},trim)).status,200,'非网关前缀模式（Docker/本地）的根路径不能被重定向');
+  assert.equal((await f.request('GET','/app/jiadi/api/session',undefined,{},trim)).status,200,'重定向不能吃掉 API');
+});
 test('gateway trust uses X-Trim identity without a ledger login password',async t=>{
   const f=await fixture(t,{trustGateway:true,gatewayPrefix:'/app/jiadi'});
   const trim={'x-trim-userid':'7','x-trim-username':'Lando','x-trim-isadmin':'true'};

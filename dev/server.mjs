@@ -287,6 +287,14 @@ export async function createLedgerApp({
     try{
       if(closed)throw fail(503,'服务正在关闭');
       const url=new URL(req.url,'http://localhost');
+      // 少了结尾斜杠时，页面里的 ./shared-client.js 会解析到上一级目录（/app/shared-client.js）而 404，
+      // 表现为整页白屏。这里把裸前缀重定向到带斜杠的地址，别指望上游网关替我们补。
+      const gwPrefix=normalizePrefix(gatewayPrefix);
+      if(gwPrefix && url.pathname===gwPrefix){
+        res.writeHead(301,{Location:gwPrefix+'/'+(url.search||''),'Cache-Control':'no-store','Content-Length':'0'});
+        res.end();
+        return;
+      }
       const route=stripGatewayPrefix(url.pathname,gatewayPrefix);
       const identity=readGatewayIdentity(req.headers,trustGateway);
       if(route==='/api/session'&&req.method==='GET'){

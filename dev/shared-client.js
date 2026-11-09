@@ -1,3 +1,4 @@
+window.JIADI_SCRIPT_OK=true;   // 供页面判断脚本真的加载了（缺尾斜杠时相对路径会 404）
 /* Shared ledger bootstrap. No asset data or password hash is cached in a browser. */
 (async()=>{
   /* 密码/解锁页在应用启动前就要跟随用户主题，否则首次设置密码时是浅色、进去后变暗色 */

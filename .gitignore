@@ -24,3 +24,7 @@ dist/
 website/.edgeone/
 website/.env
 .edgeone/
+
+# 官网下载区：安装包要入库，否则 Pages 这类从仓库构建的托管会缺文件（下载按钮 404）
+!website/downloads/
+!website/downloads/*.fpk
