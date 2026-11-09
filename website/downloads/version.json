@@ -1,13 +1,13 @@
 {
-  "tag": "v0.5.4",
-  "name": "家底 v0.5.4 · 白屏修正",
+  "tag": "v0.5.7",
+  "name": "家底 v0.5.7 · 修好重装后新密码不生效",
   "publishedAt": "2026-11-09",
-  "releasePage": "https://github.com/Sunanang/jiadi/releases/tag/v0.5.4",
+  "releasePage": "https://github.com/Sunanang/jiadi/releases/tag/v0.5.7",
   "assets": [
     {
-      "name": "jiadi-0.5.4-fnos-all.fpk",
-      "size": 220933,
-      "sha256": "574c835d4daf51dc6ffda28ba7e195e421c0d13582d933c83c7bed187980db57"
+      "name": "jiadi-0.5.7-fnos-all.fpk",
+      "size": 221303,
+      "sha256": "0b1118aee28507c234c9ce15414eea607b260ebef46137a493e07fe5f49dd7d2"
     }
   ]
 }
