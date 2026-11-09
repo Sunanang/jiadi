@@ -1,8 +1,8 @@
 appname               = jiadi
-version               = 0.5.3
+version               = 0.5.4
 display_name          = 家底
 desc                  = 家底，不是一款记账软件，这是一款简约的家庭总账资金记录软件。没有一笔笔的收入支出，只有固定周期的资金盘点。简单易用，直观展示家庭资金增长情况。不记流水、不做预算、不连银行，全本地存储。
-changelog             = 0.5.3：应用信息里的开发者与发布者入口指向开源项目主页 github.com/Sunanang/jiadi；应用内「关于」新增项目主页与许可说明。功能与数据行为不变。
+changelog             = 0.5.4：修正打开地址缺少结尾斜杠时会白屏的问题（会自动纠正到正确地址）；万一页面脚本没有加载成功，也会给出提示而不是留一片空白。功能与数据行为不变。
 platform              = all
 os_min_version        = 0.8.0
 source                = thirdparty

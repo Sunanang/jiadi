@@ -726,7 +726,7 @@
    数据（假数据，但全部由同一份账户数组推导，互相自洽）
    ========================================================= */
 /* 版本号唯一来源：与 package.json / fnos/manifest 保持一致，scripts/build-fpk.sh 会校验三处相等 */
-const APP_VERSION = '0.5.3';
+const APP_VERSION = '0.5.4';
 
 const SEED_ACCOUNTS = [
   { id:'a1',  name:'招行活期',        cat:'现金',   member:'我',   amount:93214,  prev:92000,  date:'2026-11-05', opened:'2019-03-11', due:'',          note:'日常开销', inNet:true, remind:true,  months:80 },
@@ -3592,5 +3592,21 @@ if(storageError) setTimeout(()=>toast(storageError),300);
 setTimeout(()=>openOnb(),storageError?600:260);
 </script>
 <script src="./shared-client.js"></script>
+<script>
+/* 兜底：shared-client.js 没加载成功时不要留一片白屏 */
+window.addEventListener('load',function(){
+  if(window.JIADI_SCRIPT_OK)return;
+  var p=location.pathname;
+  var hint=p.slice(-1)==='/'?'':'<br>当前地址缺少结尾的 /，试试 <b>'+p+'/</b>';
+  var d=document.createElement('div');
+  d.id='bootFail';
+  d.setAttribute('role','alert');
+  d.style.cssText='position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;background:#0F1318;color:#E6EDF5;padding:24px;text-align:center;font:15px/1.8 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif';
+  d.innerHTML='<div><p style="margin:0 0 12px;font-size:17px">页面脚本没有加载成功</p>'+
+    '<p style="margin:0;color:#A5B3C4">刷新一次试试；一直这样的话，请确认应用是否在运行。'+hint+'</p></div>';
+  document.body.appendChild(d);
+});
+</script>
+
 </body>
 </html>
