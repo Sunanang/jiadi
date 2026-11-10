@@ -1,0 +1,145 @@
+name: Release FPK and sync website
+
+# 合并到 main 之后自动完成整条发布链路：
+#   测试 → 打 FPK → 建 GitHub Release → 把安装包搬进 website/downloads → 提交回 main
+# 最后一步的提交会触发 EdgeOne 构建，于是官网自动指向刚发布的包。
+#
+# 版本号没变时（例如只改了官网文案）不会重复发版：tag 已存在就跳过打包与 Release，
+# 只做官网同步，让构建照常进行。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 串行化，避免两次合并并行发版互相覆盖
+concurrency:
+  group: jiadi-release
+  cancel-in-progress: false
+
+env:
+  FNPACK_SHA256: 54b97fa7b70968c4d05c79840f5daeff508957d0bb2062fdb0376d00d9615c93
+  FNPACK_URL: https://static2.fnnas.com/fnpack/fnpack-1.2.3-linux-amd64
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Server and domain tests
+        run: npm test
+      - name: HTTP acceptance
+        run: npm run test:http
+      - name: Gateway onboarding
+        run: npm run test:gateway
+
+  build:
+    name: Build FPK
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pinned official fnpack
+        run: |
+          set -euo pipefail
+          FNPACK="$RUNNER_TEMP/fnpack"
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 120 \
+            "$FNPACK_URL" --output "$FNPACK"
+          printf '%s  %s\n' "$FNPACK_SHA256" "$FNPACK" | sha256sum --check -
+          chmod +x "$FNPACK"
+          printf 'FNPACK=%s\n' "$FNPACK" >> "$GITHUB_ENV"
+      - name: Build FPK and SHA-256
+        # build-fpk.sh 自带三方版本号校验：package.json == fnos/manifest == jiadi-ui.html
+        run: bash scripts/build-fpk.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jiadi-fpk
+          path: |
+            dist/*.fpk
+            dist/*.fpk.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Release and sync website
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 提交官网改动需要完整历史，便于后续 push
+          fetch-depth: 0
+
+      - name: Read version and detect existing release
+        id: ver
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          TAG="v${VERSION}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$TAG 已发布，本次只同步官网，不重复打包"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::准备发布 $TAG"
+          fi
+
+      - uses: actions/download-artifact@v4
+        if: steps.ver.outputs.exists == 'false'
+        with:
+          name: jiadi-fpk
+          path: dist
+
+      - name: Verify package before publishing
+        if: steps.ver.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          ls -l dist/
+          cd dist && sha256sum --check *.sha256
+
+      - name: Publish GitHub Release
+        if: steps.ver.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.ver.outputs.tag }}"
+          gh release create "$TAG" \
+            dist/*.fpk dist/*.fpk.sha256 \
+            --title "家底 $TAG" \
+            --generate-notes
+
+      - name: Sync installers into website/downloads
+        run: bash scripts/sync-website-downloads.sh
+
+      - name: Commit website downloads
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain website/downloads)" ]; then
+            echo "官网下载区已是最新，无需提交"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add website/downloads
+          # [skip ci] 让 GitHub Actions 不再因这次提交重跑；
+          # EdgeOne 不认这个标记，仍会照常构建，官网因此自动指向新包。
+          git commit -m "chore(release): 官网下载区同步到 ${{ steps.ver.outputs.tag }} [skip ci]"
+          git push
