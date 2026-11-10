@@ -1,0 +1,10 @@
+#!/bin/sh
+# 禁止直接推送 main：发布只能从 dev 合并过去，保证「合并 main 才发版/发官网」这条线不被绕过。
+# 启用：git config core.hooksPath .githooks
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = refs/heads/main ]; then
+    echo '禁止直接推送 main。请在 dev 开发，确认后开 dev → main 的 PR 合并发布。' >&2
+    exit 1
+  fi
+done
+exit 0
