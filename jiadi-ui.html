@@ -1038,7 +1038,7 @@ const S = {
   privacy:false,
   trend:{ mode:'net', grain:'month', from:0, to:Number.MAX_SAFE_INTEGER },
   people:{ sort:'amount', showArchived:false },
-  detail:{ member:'all', cat:'all', changed:false, stale:false, group:'cat', sort:'cat', showClosed:false },
+  detail:{ member:'all', cat:'all', changed:false, stale:false, group:'cat', sort:'cat', showClosed:false, q:'' },
   checkin:{ step:1, values:Object.create(null), jumpsOk:false, date:todayStr() },
   settings:{ '3':false }
 };
@@ -2156,6 +2156,9 @@ function detailFilters(){
     if(f.cat==='assets' ? a.isDebt : (f.cat!=='all' && a.cat!==f.cat)) return false;
     if(f.changed && a.amount === a.prev) return false;
     if(f.stale && !isStale(a)) return false;
+    /* 搜索：账户名 / 备注 / 成员 / 类别，大小写与首尾空格都不敏感 */
+    const q = String(f.q || '').trim().toLowerCase();
+    if(q && !(a.name + ' ' + (a.note || '') + ' ' + (a.member || '') + ' ' + (a.cat || '')).toLowerCase().includes(q)) return false;
     return true;
   };
 }
@@ -2192,7 +2195,7 @@ function renderDetail(){
 
   $('#v-detail').innerHTML = `
     <div class="topbar">
-      <h1>明细</h1><span class="sub">按类别分组 · 负债置末</span>
+      <h1>明细</h1><span class="sub">按类别分组 · 负债置末${f.q ? ' · 命中 ' + rows.length + ' 个账户' : ''}</span>
     </div>
 
     <div class="stack">
@@ -2231,6 +2234,13 @@ function renderDetail(){
             <span class="flabel">状态</span>
             <button class="chip ${f.changed?'on':''}" data-f="changed">仅看有变化</button>
             <button class="chip ${f.stale?'on':''}" data-f="stale">仅看陈旧</button>
+          </div>
+          <div class="fgroup">
+            <span class="flabel">搜索</span>
+            <input class="sel" id="detailSearch" type="search" inputmode="search" autocomplete="off"
+                   placeholder="账户名 / 备注 / 成员" value="${esc(f.q||'')}" aria-label="搜索账户"
+                   style="height:28px;min-width:190px">
+            ${f.q ? '<button class="chip" id="clearSearch">清除搜索</button>' : ''}
           </div>
         </div>
 
@@ -2328,8 +2338,20 @@ function renderDetail(){
   $('#groupSel').onchange = e=>{ S.detail.group = e.target.value; rerender(); };
   $('#sortSel').onchange = e=>{ S.detail.sort = e.target.value; rerender(); };
   $('#newAcctBtn').onclick = ()=> accountFormDrawer(null);
+  const sq = $('#detailSearch');
+  if(sq){
+    sq.oninput = ()=>{
+      S.detail.q = sq.value;
+      const pos = sq.selectionStart;
+      rerender();
+      const next = $('#detailSearch');
+      if(next){ next.focus(); try{ if(pos!==null) next.setSelectionRange(pos,pos); }catch(e){} }
+    };
+    sq.onkeydown = e=>{ if(e.key === 'Escape'){ S.detail.q = ''; rerender(); } };
+  }
+  const cs = $('#clearSearch'); if(cs) cs.onclick = ()=>{ S.detail.q = ''; rerender(); };
   $('#resetFilters').onclick = async()=>{
-    S.detail = {...S.detail, member:'all', cat:'all', changed:false, stale:false};
+    S.detail = {...S.detail, member:'all', cat:'all', changed:false, stale:false, q:''};
     rerender(); toast('筛选已清除');
   };
   const ec = $('#emptyClear'); if(ec) ec.onclick = $('#resetFilters').onclick;
@@ -3147,7 +3169,45 @@ function snapshotDrawer(idx){
   if(!month) return;
   const records=getSnapshots().filter(sn=>sn.month===month);
   openDrawer({title:month+' 快照',sub:records.length?`${records.length} 条已保存记录 · 当前代表点：${esc(PREF.multiPoint)}`:'当前余额汇总 · 尚未保存月度快照',
-    body:`<div class="kv"><span class="k">总资产</span><span class="v">¥${fmtY(s.A[idx])}</span></div><div class="kv"><span class="k">总负债</span><span class="v">¥${fmtY(s.L[idx])}</span></div><div class="kv"><span class="k">净资产</span><span class="v">¥${fmtY(s.N[idx])}</span></div><div class="kv"><span class="k">负债率</span><span class="v">${s.A[idx]? (s.L[idx]/s.A[idx]*100).toFixed(1)+'%':'—'}</span></div><div class="sec">已保存记录</div><div class="list">${records.map(sn=>`<div class="lrow"><span class="nm">${esc(sn.date||sn.month+'（未记录具体日期）')}</span><span class="amt">净值 ${fmtY(sn.A-sn.L)}</span></div>`).join('')||'<div class="hint" style="padding:16px">盘点提交后才有记录。</div>'}</div>`,foot:''});
+    body:`<div class="kv"><span class="k">总资产</span><span class="v">¥${fmtY(s.A[idx])}</span></div><div class="kv"><span class="k">总负债</span><span class="v">¥${fmtY(s.L[idx])}</span></div><div class="kv"><span class="k">净资产</span><span class="v">¥${fmtY(s.N[idx])}</span></div><div class="kv"><span class="k">负债率</span><span class="v">${s.A[idx]? (s.L[idx]/s.A[idx]*100).toFixed(1)+'%':'—'}</span></div><div class="sec">已保存记录</div><div class="list">${records.map(sn=>`<div class="lrow"><span class="nm">${esc(sn.date||sn.month+'（未记录具体日期）')}</span><span class="amt">净值 ${fmtY(sn.A-sn.L)}</span></div>`).join('')||'<div class="hint" style="padding:16px">盘点提交后才有记录。</div>'}</div>`,
+    foot: records.length ? `<button class="btn sm danger" id="delPeriod">删除这一期</button>` : ''});
+  const dp=$('#delPeriod'); if(dp) dp.onclick = ()=> deletePeriod(month);
+}
+/* 删除某一期盘点：撤掉本期快照，并把本期写入的账户历史回滚到上一期。
+   历史只剩本期一条的账户无法回滚（那是账户的起点），保持不动并在提示里说明。 */
+function deletePeriod(month){
+  if(S.privacy){ toast('遮挡中，请先输入应用密码解除'); return; }
+  const snaps = getSnapshots().filter(sn=>sn.month===month);
+  if(!snaps.length){ toast('这一期没有可删除的盘点记录'); return; }
+  const hitOf = a => (Array.isArray(a.history) ? a.history.filter(h=>String(h.date||'').slice(0,7)===month).length : 0);
+  const hit = ACCOUNTS.reduce((n,a)=>n+hitOf(a),0);
+  const stuck = ACCOUNTS.filter(a=>hitOf(a) && hitOf(a) === (a.history||[]).length).length;
+  modal({
+    title:'删除 ' + month + ' 这一期？',
+    desc:'将删除本期 <b>' + snaps.length + '</b> 条快照，并回滚本期写入的 <b>' + hit + '</b> 条账户历史，账户余额回到上一期。'
+      + (stuck ? '<br><br>有 <b>' + stuck + '</b> 个账户的历史只有这一期，无法回滚，会保持现状。' : '')
+      + '<br><br>原始记录不可撤销。请输入 <b>删除</b> 确认。',
+    input:'删除', expect:'删除', placeholder:'删除', okText:'删除', danger:true,
+    onOk: async()=>{
+      setSnapshots(getSnapshots().filter(sn=>sn.month!==month));
+      let rolled = 0;
+      ACCOUNTS.forEach(a=>{
+        const n = hitOf(a);
+        if(!n || n === (a.history||[]).length) return;      // 没有本期记录 / 只剩本期 → 不动
+        const next = a.history.filter(h=>String(h.date||'').slice(0,7)!==month);
+        const last = next[next.length-1], prev = next.length>1 ? next[next.length-2] : last;
+        a.history = next;
+        a.amount = last.amount; a.date = last.date; a.prev = prev.amount;
+        a.months = new Set(next.map(h=>String(h.date).slice(0,7))).size;
+        rolled++;
+      });
+      if(!await saveDB()) return;
+      closeDrawer();
+      logIt('删除盘点期', month + ' · ' + snaps.length + ' 条快照 · 回滚 ' + rolled + ' 个账户');
+      renderCurrent();
+      toast('已删除 ' + month + ' 这一期');
+    }
+  });
 }
 
 function membersDrawer(){

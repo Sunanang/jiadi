@@ -328,6 +328,49 @@ await test('trend ranges reset to available periods after import and grain chang
   await ev("S.trend.from=2;S.trend.to=3;show('trend');$('#trendGrain').value='year';$('#trendGrain').dispatchEvent(new Event('change'))");
   assert.equal(await ev('S.trend.from'),0);assert.equal(await ev('S.trend.to'),2);assert.match(await ev("$('#v-trend .topbar').textContent"),/2024 年/);
 });
+await test('detail search filters by name, note and member and keeps the caret',async()=>{
+  await seed({v:1,accounts:[
+    account('cash',100,{note:'主账户'}),
+    account('bond',200,{cat:'投资',note:'三年期'}),
+    account('loan',50,{cat:'负债',isDebt:true,member:'配偶'})
+  ],members:[{name:'我',color:'#2F4B6E'},{name:'配偶',color:'#6E9A72'}],archived:[],snapshots:[]});
+  await ev("S.detail={member:'all',cat:'all',changed:false,stale:false,group:'cat',sort:'cat',showClosed:false,q:''}");  // 前面的用例会留下筛选状态
+  await ev("show('detail')");assert.equal(await ev("$$('#v-detail [data-acct]').length"),3);
+  await ev("(()=>{const s=$('#detailSearch');s.value='三年';s.dispatchEvent(new Event('input'));})()");
+  assert.equal(await ev("$$('#v-detail [data-acct]').length"),1);
+  assert.equal(await ev("$('#detailSearch').value"),'三年');                    // 重渲染后输入框还在、值不丢
+  assert.equal(await ev("document.activeElement && document.activeElement.id"),'detailSearch');
+  assert.match(await ev("$('#v-detail .topbar .sub').textContent"),/命中 1 个账户/);
+  await ev("(()=>{const s=$('#detailSearch');s.value='配偶';s.dispatchEvent(new Event('input'));})()");
+  assert.equal(await ev("$$('#v-detail [data-acct]').length"),1);
+  await ev("(()=>{const s=$('#detailSearch');s.value='';s.dispatchEvent(new Event('input'));})()");
+  assert.equal(await ev("$$('#v-detail [data-acct]').length"),3);
+  await ev("show('home');show('detail')");                                       // 搜索词跟着 S.detail 走，没用就为空
+  assert.equal(await ev("$('#detailSearch').value"),'');
+  await ev("S.detail.q='三年';show('detail');$('#resetFilters').click()");
+  assert.equal(await ev("$$('#v-detail [data-acct]').length"),3);
+});
+await test('deleting a checkin period drops its snapshot and rolls the account back',async()=>{
+  await seed({v:1,accounts:[{id:'cash',name:'现金',cat:'现金',member:'我',amount:300,prev:200,date:'2026-10-05',opened:'2026-01-01',inNet:true,remind:true,
+    history:[{date:'2026-09-05',amount:100},{date:'2026-10-05',amount:300}]}],
+    members:[{name:'我',color:'#2F4B6E'}],archived:[],
+    snapshots:[{month:'2026-09',date:'2026-09-05',A:100,L:0},{month:'2026-10',date:'2026-10-05',A:300,L:0}]});
+  await ev("show('trend')");
+  const idx=await ev("series().labels.indexOf('2026-10')");
+  assert.equal(idx>=0,true,'2026-10 应出现在趋势里');
+  await ev(`snapshotDrawer(${idx})`);
+  assert.equal(await ev("!!$('#delPeriod')"),true,'快照抽屉里应有删除入口');
+  await ev("$('#delPeriod').click()");
+  await ev("(async()=>{$('#modalInput').value='删除';await $('#modalOk').onclick();})()");
+  assert.equal(await ev("getSnapshots().some(s=>s.month==='2026-10')"),false,'本期快照应被删除');
+  assert.equal(await ev("getSnapshots().some(s=>s.month==='2026-09')"),true,'其他期快照必须留着');
+  assert.equal(await ev("ACCOUNTS[0].amount"),100,'账户余额要回滚到上一期');
+  assert.equal(await ev("ACCOUNTS[0].date"),'2026-09-05');
+  assert.equal(await ev("ACCOUNTS[0].history.length"),1);
+  assert.equal(await ev("$('#toast').textContent").then(t=>/已删除 2026-10/.test(t)),true);
+  assert.equal(await ev("document.getElementById('drawer').classList.contains('on')"),false,'删完要关抽屉');
+  await ev("show('detail')");assert.equal(await ev("$$('#v-detail [data-acct]').length"),1);
+});
 await test('desktop/mobile render and SVG coordinates remain finite',async()=>{
   await seed();await ev("resetDB();setTheme('light');show('home');$('#toast').classList.remove('on')");await app.screenshot(resolve('audit/desktop.png'));await app.screenshot(resolve('audit/mobile.png'),390,844);
   for(const route of ['home','trend','detail','checkin','settings','people','report']){await ev(`show('${route}')`);const widths=await ev('({page:document.documentElement.scrollWidth,viewport:innerWidth})');assert.equal(widths.page<=widths.viewport,true,route+' '+JSON.stringify(widths));assert.doesNotMatch(await ev("$('.view.is-active').innerHTML"),/NaN|Infinity/);}
