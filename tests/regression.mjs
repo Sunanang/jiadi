@@ -371,6 +371,35 @@ await test('deleting a checkin period drops its snapshot and rolls the account b
   assert.equal(await ev("document.getElementById('drawer').classList.contains('on')"),false,'删完要关抽屉');
   await ev("show('detail')");assert.equal(await ev("$$('#v-detail [data-acct]').length"),1);
 });
+await test('net worth goal is stored in the ledger and drives the home card',async()=>{
+  await seed({v:1,accounts:[account('cash',1000)],members:[{name:'我',color:'#2F4B6E'}],archived:[],snapshots:[{month:'2026-10',A:800,L:0}]});
+  await ev('GOAL=null;show("home")');
+  assert.match(await ev("$('#goalCard').textContent"),/还没有设定/);
+  await ev('goalDrawer()');
+  await ev("$('#goalAmount').value='2000';$('#goalYear').value='2026'");
+  await ev("(async()=>{await $('#goalSave').onclick();})()");
+  assert.deepEqual(await ev('dataState().goal'),{year:2026,amount:2000});
+  assert.match(await ev("$('#goalCard').textContent"),/完成 50\.0%/);
+  assert.match(await ev("$('#goalCard').textContent"),/还差/);
+  await ev("$('#goalAmount').value='0'");                     // 非法金额不许写进去
+  await ev('goalDrawer()');
+  await ev("$('#goalAmount').value='0';$('#goalYear').value='2026'");
+  await ev("(async()=>{await $('#goalSave').onclick();})()");
+  assert.deepEqual(await ev('dataState().goal'),{year:2026,amount:2000},'非法输入不能覆盖已有目标');
+  await ev("$('#goalAmount').value='2000';$('#goalYear').value='2026'");
+  await ev("(async()=>{await $('#goalSave').onclick();})()");
+  await ev('goalDrawer()');
+  await ev("(async()=>{await $('#goalClear').onclick();})()");
+  assert.equal(await ev('dataState().goal===undefined'),true,'清除后账本里不该再有 goal');
+});
+await test('period table shows year-over-year and dashes when last year is missing',async()=>{
+  await seed({v:1,accounts:[account('cash',150)],members:[{name:'我'}],archived:[],snapshots:[{month:'2025-10',A:100,L:0},{month:'2026-10',A:150,L:0}]});
+  await ev("PREF.grain='月';S.trend.grain='month';S.trend.from=0;S.trend.to=Number.MAX_SAFE_INTEGER;show('trend')");   // 前面的用例可能把粒度和区间改过
+  const txt=await ev("$('#v-trend').textContent");
+  assert.match(txt,/同比/,'表头要有同比列');
+  assert.match(txt,/\+50\.0%/,'2026-10 对 2025-10 应是 +50.0%');
+  assert.equal(await ev("yoyOf('2024-10')"),null,'去年同月没有数据时必须给空，不许编数');
+});
 await test('desktop/mobile render and SVG coordinates remain finite',async()=>{
   await seed();await ev("resetDB();setTheme('light');show('home');$('#toast').classList.remove('on')");await app.screenshot(resolve('audit/desktop.png'));await app.screenshot(resolve('audit/mobile.png'),390,844);
   for(const route of ['home','trend','detail','checkin','settings','people','report']){await ev(`show('${route}')`);const widths=await ev('({page:document.documentElement.scrollWidth,viewport:innerWidth})');assert.equal(widths.page<=widths.viewport,true,route+' '+JSON.stringify(widths));assert.doesNotMatch(await ev("$('.view.is-active').innerHTML"),/NaN|Infinity/);}

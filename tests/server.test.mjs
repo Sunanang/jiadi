@@ -5,6 +5,7 @@ import {mkdtemp,readFile,writeFile,rm,mkdir,rename,readdir,stat} from 'node:fs/p
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {webcrypto} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {createLedgerApp,decryptBackup,encryptBackup} from '../server.mjs';
 
 const ledger=(amount=10)=>({v:1,accounts:[{id:'cash',name:'现金',cat:'现金',member:'我',amount,prev:amount,date:'2026-11-06'}],members:[{name:'我'}],snapshots:[],archived:[]});
@@ -354,4 +355,50 @@ test('import-style replace snapshots the previous ledger before overwriting',asy
   assert.equal(snap.revision,1);
   assert.equal(((await stat(join(keep,names[0]))).mode&0o777).toString(8),'600');
   assert.equal((await request('GET','/api/ledger',undefined,client)).data.ledger.accounts[0].name,'乙账户');
+});
+
+test('净值目标存进账本并跨设备一致，非法目标被拒绝',async t=>{
+  const {request,login}=await fixture(t);
+  const client=await login('abc1',true);
+  const base={v:1,accounts:[{id:'a1',name:'现金',cat:'现金',member:'我',amount:100,prev:100,date:'2026-11-06'}],members:[{name:'我'}],archived:[],snapshots:[]};
+  const withGoal={...base,goal:{year:2026,amount:2000}};
+  const saved=await request('PUT','/api/ledger',{revision:0,ledger:withGoal},client);
+  assert.equal(saved.status,200,JSON.stringify(saved.data));
+  const read=await request('GET','/api/ledger',undefined,client);
+  assert.deepEqual(read.data.ledger.goal,{year:2026,amount:2000},'目标应原样存回');
+  const bad=await request('PUT','/api/ledger',{revision:saved.data.revision,ledger:{...base,goal:{year:1800,amount:2000}}},client);
+  assert.equal(bad.status,400,'越界年份必须被拒');
+  const badMoney=await request('PUT','/api/ledger',{revision:saved.data.revision,ledger:{...base,goal:{year:2026,amount:-5}}},client);
+  assert.equal(badMoney.status,400,'负数目标必须被拒');
+  const cleared=await request('PUT','/api/ledger',{revision:saved.data.revision,ledger:base},client);
+  assert.equal(cleared.status,200);
+  assert.equal((await request('GET','/api/ledger',undefined,client)).data.ledger.goal,undefined,'不带 goal 时应真的没有');
+});
+
+test('reset-vault 脚本只清密码，账本与日志一个字节都不动',async t=>{
+  const dataDir=await mkdtemp(join(tmpdir(),'jiadi-reset-vault-'));
+  t.after(async()=>{await rm(dataDir,{recursive:true,force:true});});
+  const disk={v:1,revision:9,vault:{salt:'a'.repeat(32),hash:'b'.repeat(64)},
+    ledger:{v:1,accounts:[{id:'cash',name:'现金',cat:'现金',member:'我',amount:100,prev:100,date:'2026-11-06'}],members:[{name:'我'}],archived:[],snapshots:[]},
+    logs:[{t:'2026-11-06T10:00:00.000Z',act:'盘点提交',obj:'1 个账户'}]};
+  const ledgerPath=join(dataDir,'ledger.json');
+  await writeFile(ledgerPath,JSON.stringify(disk),{mode:0o600});
+  const script=new URL('../scripts/reset-vault.mjs',import.meta.url).pathname;
+
+  execFileSync(process.execPath,[script,'--data-dir',dataDir],{encoding:'utf8'});   // 检查模式
+  assert.notEqual(JSON.parse(await readFile(ledgerPath,'utf8')).vault,null,'检查模式不许改文件');
+
+  const out=execFileSync(process.execPath,[script,'--data-dir',dataDir,'--yes'],{encoding:'utf8'});
+  assert.match(out,/应用密码已清除/);
+  const after=JSON.parse(await readFile(ledgerPath,'utf8'));
+  assert.equal(after.vault,null,'密码必须清空');
+  assert.deepEqual(after.ledger,disk.ledger,'账本数据一个字节都不许动');
+  assert.deepEqual(after.logs,disk.logs,'操作日志也不许动');
+  assert.equal(after.revision,disk.revision);
+  const backups=(await readdir(join(dataDir,'.jiadi-keep'))).filter(n=>n.startsWith('ledger-before-vault-reset-'));
+  assert.equal(backups.length,1,'必须留一份回滚备份');
+  assert.deepEqual(JSON.parse(await readFile(join(dataDir,'.jiadi-keep',backups[0]),'utf8')).vault,disk.vault,'备份里要保留原密码状态');
+
+  const again=execFileSync(process.execPath,[script,'--data-dir',dataDir,'--yes'],{encoding:'utf8'});
+  assert.match(again,/不需要重置/,'没有密码时应直接说不需要');
 });

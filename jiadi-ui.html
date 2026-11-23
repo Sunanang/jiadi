@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>家底 · 资产台账</title>
+<link rel="icon" href="data:," />
 <style>
   *{box-sizing:border-box}
   :root{
@@ -761,9 +762,10 @@ function todayStr(){
 const clone = o => JSON.parse(JSON.stringify(o));
 const DB_KEY = 'jiadi.data.v1';
 let storageRaw = null, lastGoodState = null, storageError = '';
-function dataState(){ return {v:1, accounts:ACCOUNTS, members:MEMBERS, archived:ARCHIVED, snapshots:getSnapshots()}; }
+function dataState(){ return {v:1, accounts:ACCOUNTS, members:MEMBERS, archived:ARCHIVED, snapshots:getSnapshots(), ...(GOAL ? {goal:GOAL} : {})}; }
 function restoreState(o){
   ACCOUNTS = clone(o.accounts); MEMBERS = clone(o.members); ARCHIVED = clone(o.archived); setSnapshots(clone(o.snapshots));
+  GOAL = o.goal ? clone(o.goal) : null;
 }
 function clearCheckin(){ S.checkin = {step:1, values:Object.create(null), jumpsOk:false, date:todayStr()}; }
 function resetTrendRange(){ S.trend.from=0; S.trend.to=Number.MAX_SAFE_INTEGER; }
@@ -809,9 +811,11 @@ let ACCOUNTS = _db ? _db.accounts : [];
 
 let MEMBERS  = _db ? _db.members : [];
 let ARCHIVED = _db ? _db.archived : [];
+let GOAL = _db && _db.goal ? _db.goal : null;   // 净值目标 {year, amount}，存进账本，跨设备共享
 async function resetDB(){
   ACCOUNTS = SEED_ACCOUNTS.map(a=>Object.assign({},a));
   _snapCache = seedSnapshots();
+  GOAL = null;                                   // 演示数据不带目标
   MEMBERS  = SEED_MEMBERS.map(m=>Object.assign({},m));
   ARCHIVED = SEED_ARCHIVED.map(a=>Object.assign({},a));
   if(!await saveDB({replaceUnreadable:true,reason:'replace'})) return false;
@@ -1105,6 +1109,17 @@ function getSnapshots(){
 }
 function setSnapshots(arr){ _snapCache = arr; }
 function categoryTotals(){ return Object.fromEntries(CATS.map(c=>[c, sumA(ACCOUNTS.filter(a=>a.cat===c && isAsset(a) && isCounted(a)))])); }
+/* 同比：周期末月 → 去年同月的代表点，缺任何一头就返回 null（不编数） */
+function yoyOf(endMonth){
+  if(!endMonth) return null;
+  const s = series(), map = new Map();
+  s.labels.forEach((lb,i)=>map.set(lb, s.N[i]));
+  const parts = String(endMonth).split('-');
+  if(parts.length !== 2) return null;
+  const cur = map.get(endMonth), prev = map.get(String(Number(parts[0])-1)+'-'+parts[1]);
+  if(cur === undefined || prev === undefined || !prev) return null;
+  return roundMoney((cur - prev) / Math.abs(prev) * 100);
+}
 const series = () => {
   const t = TOT(), cur = todayStr().slice(0,7);
   const snaps = getSnapshots().map((sn,i)=>({...sn, order:i})).sort((a,b)=>(a.date||a.month+'-01').localeCompare(b.date||b.month+'-01') || a.order-b.order);
@@ -1614,6 +1629,59 @@ function drawChart(svgId, mode, grain, tipId, shade){
 /* =========================================================
    P1 首页
    ========================================================= */
+/* 净值目标：目标值存进账本（goal:{year,amount}），这里只算完成度与节奏，不改任何账目 */
+function goalProgress(){
+  if(!GOAL || !GOAL.amount) return null;
+  const cur = TOT().N, target = GOAL.amount;
+  const s = series(), n = s.N.length, span = Math.max(0, Math.min(12, n-1));
+  const avg = span > 0 ? (s.N[n-1] - s.N[n-1-span]) / span : 0;
+  const need = roundMoney(target - cur);
+  return { target, cur, need, avg,
+    pct: target > 0 ? cur / target * 100 : 0,
+    months: (avg > 0 && need > 0) ? Math.ceil(need / avg) : null };
+}
+function goalBlock(){
+  const p = goalProgress();
+  const head = `<div class="card-h"><h2>净值目标${p ? ' · ' + GOAL.year : ''}</h2><span class="meta">${p ? '存进账本 · 电脑手机一致' : '还没有设定'}</span><button class="btn ghost sm" id="goalEdit" style="margin-left:auto">${p ? '编辑' : '设置目标'}</button></div>`;
+  if(!p) return `<section class="card" id="goalCard">${head}<div class="total-row"><span class="hint">设一个年度目标，首页显示完成度、差额和按当前节奏还要多久。</span></div></section>`;
+  const pct = Math.max(0, Math.min(100, p.pct));
+  const eta = p.need <= 0 ? '已达成目标' : (p.months === null ? '按最近节奏暂看不到达成' : '按最近 12 个月节奏约 ' + p.months + ' 个月后达成');
+  return `<section class="card" id="goalCard">${head}
+    <div style="padding:2px 20px 14px">
+      <div class="kv"><span class="k">目标</span><span class="v">¥${fmtY(p.target)}</span></div>
+      <div class="kv"><span class="k">当前净值</span><span class="v">¥${fmtY(p.cur)}</span></div>
+      <div class="kv"><span class="k">差额</span><span class="v" style="color:${p.need > 0 ? 'var(--debt)' : 'var(--up)'}">${p.need > 0 ? '还差 ¥' + fmtY(p.need) : '已超出 ¥' + fmtY(-p.need)}</span></div>
+      <div style="margin:12px 0 7px;height:6px;background:var(--raised);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:${pct.toFixed(1)}%;background:var(--asset)"></i></div>
+      <div class="hint">完成 ${p.pct.toFixed(1)}% · ${eta}</div>
+    </div></section>`;
+}
+function goalDrawer(){
+  if(S.privacy){ toast('遮挡中，请先输入应用密码解除'); return; }
+  const g = GOAL || { year:new Date().getFullYear(), amount:0 };
+  openDrawer({ title:'净值目标', sub:'写进账本 · 电脑和手机共用一份',
+    body:`<div style="padding:2px 20px 12px">
+      <label class="flabel" for="goalAmount" style="display:block;margin:10px 0 6px">目标净值（元）</label>
+      <input class="sel" id="goalAmount" inputmode="decimal" autocomplete="off" style="width:100%;height:34px" value="${g.amount ? String(g.amount) : ''}" placeholder="例如 2000000">
+      <label class="flabel" for="goalYear" style="display:block;margin:14px 0 6px">目标年份</label>
+      <input class="sel" id="goalYear" inputmode="numeric" autocomplete="off" style="width:100%;height:34px" value="${g.year || new Date().getFullYear()}">
+      <div class="hint" style="margin-top:10px">目标只用于显示完成度与节奏估算，不影响任何账户与快照。</div>
+    </div>`,
+    foot:`<button class="btn sm primary" id="goalSave">保存</button><button class="btn ghost sm" id="goalClear">清除目标</button>` });
+  $('#goalSave').onclick = async()=>{
+    const amount = parseAmount($('#goalAmount').value);
+    const year = Number(String($('#goalYear').value).trim());
+    if(amount === null || amount <= 0){ toast('目标金额要填一个大于 0 的数字'); return; }
+    if(!Number.isInteger(year) || year < 2000 || year > 2100){ toast('年份要在 2000–2100 之间'); return; }
+    GOAL = { year, amount };
+    if(!await saveDB()) return;
+    closeDrawer(); logIt('设置净值目标', year + ' 年 · ¥' + fmtY(amount)); renderCurrent(); toast('净值目标已保存');
+  };
+  $('#goalClear').onclick = async()=>{
+    GOAL = null;
+    if(!await saveDB()) return;
+    closeDrawer(); logIt('清除净值目标', ''); renderCurrent(); toast('已清除净值目标');
+  };
+}
 function eqBlock(){
   const t = TOT(), lr = t.A ? t.L/t.A*100 : 0, d = delta();
   const noDebt = t.L === 0;
@@ -1705,6 +1773,7 @@ function renderHome(){
 
     <div class="stack">
       ${eqBlock()}
+      ${goalBlock()}
 
       <section class="card">
         <div class="card-h">
@@ -1835,6 +1904,7 @@ function renderHome(){
 
   $('#goCheckin').onclick = () => show('checkin');
   $('#toTrend').onclick = () => show('trend');
+  const goalBtn = $('#goalEdit'); if(goalBtn) goalBtn.onclick = () => goalDrawer();
   const bkBtn = document.getElementById('backupBtn');
   if(bkBtn) bkBtn.onclick = () => exportJSON();
   $('#v-home').querySelectorAll('[data-drill]').forEach(el=>el.onclick = async()=>{
@@ -2004,16 +2074,19 @@ function renderTrend(){
               <span style="flex:1 1 0;text-align:right">负债</span>
               <span style="flex:1 1 0;text-align:right">净值</span>
               <span style="flex:1 1 0;text-align:right">较上次</span>
+              <span style="flex:0 0 72px;text-align:right">同比</span>
               <span style="flex:0 0 64px;text-align:right">负债率</span>
             </div>
             ${LBL.map((m,i)=>{
               const prev = i? nS.N[i-1] : null, c = prev===null?null:nS.N[i]-prev;
+              const yoy = yoyOf(nS.months[i]);
               return `<div class="lrow hoverable" data-month="${esc(nS.months[i])}" style="height:36px">
                 <span class="nm" style="flex:0 0 84px;font-family:var(--num);font-size:12.5px">${m}</span>
                 <span class="num" style="flex:1 1 0;text-align:right;font-size:12.5px">${fmtY(nS.A[i])}</span>
                 <span class="num" style="flex:1 1 0;text-align:right;font-size:12.5px;color:var(--debt)">${fmtY(nS.L[i])}</span>
                 <span class="num" style="flex:1 1 0;text-align:right;font-size:12.5px;font-weight:500">${fmtY(nS.N[i])}</span>
                 <span class="num" style="flex:1 1 0;text-align:right;font-size:12.5px;color:${c===null?'var(--mut)':(c>0?'var(--up)':'var(--down)')}">${c===null?'—':sign(c)+fmtY(Math.abs(c))}</span>
+                <span class="num" style="flex:0 0 72px;text-align:right;font-size:12.5px;color:${yoy===null?'var(--mut)':(yoy>0?'var(--up)':'var(--down)')}">${yoy===null?'—':sign(yoy)+yoy.toFixed(1)+'%'}</span>
                 <span class="num" style="flex:0 0 64px;text-align:right;font-size:12.5px;color:var(--ink-2)">${nS.A[i]?(nS.L[i]/nS.A[i]*100).toFixed(1)+'%':'—'}</span>
               </div>`;
             }).join('')}
@@ -2610,7 +2683,8 @@ const SETTINGS = [
   { g:'成员与账户', meta:'账户级属性在账户详情里改', items:[
     { n:'—', name:'成员管理', desc:'增删改归档；归档前须处理名下账户', type:'action', label:'打开抽屉', act:'members' },
     { n:'—', name:'类别字典', desc:'固定类别：现金 / 存款 / 投资 / 固定资产 / 负债', type:'readonly' },
-    { n:'—', name:'账户级属性', desc:'计入净值 / 参与提醒 / 是否负债 / 到期提醒 / 是否共同 —— 每账户独立，在账户抽屉里改', type:'readonly2', badge:'5 项' }
+    { n:'—', name:'账户级属性', desc:'计入净值 / 参与提醒 / 是否负债 / 到期提醒 / 是否共同 —— 每账户独立，在账户抽屉里改', type:'readonly2', badge:'5 项' },
+    { n:'—', name:'净值目标', desc:'年度目标写进账本，首页显示完成度、差额与达成节奏', type:'action', label:'设置', act:'goal' }
   ]},
   { g:'数据', meta:'服务端统一保存，电脑和手机共享', items:[
     { n:'—', name:'导出 JSON', desc:'验证应用密码后生成加密备份，导入时需导出密码', type:'action', label:'导出', act:'exportJson' },
@@ -2685,6 +2759,7 @@ function renderSettings(){
   $$('#v-settings [data-act]').forEach(b=>b.onclick = async()=>{
     const a = b.dataset.act;
     if(a === 'members') membersDrawer();
+    else if(a === 'goal') goalDrawer();
     else if(a === 'exportJson') exportJSON();
     else if(a === 'exportCsv') exportCSV();
     else if(a === 'importLedger') importLedger();
@@ -2700,7 +2775,7 @@ function renderSettings(){
     else if(a === 'pin') askPinChange();
     else if(a === 'wipe') modal({
       title:'清空全部数据', desc:'账户、成员、快照和操作日志全部清空，不可撤销。显示偏好及应用密码保留。请输入 <b>家底</b> 确认。', input:'家底', expect:'家底', placeholder:'家底', okText:'清空', danger:true,
-      onOk: async()=>{ ACCOUNTS = []; MEMBERS = []; ARCHIVED = []; setSnapshots([]); if(!await saveDB({replaceUnreadable:true,clearLogs:true,reason:'clear'})) return; clearCheckin(); try{await window.jiadiClearDraft?.();}catch{}
+      onOk: async()=>{ ACCOUNTS = []; MEMBERS = []; ARCHIVED = []; setSnapshots([]); GOAL = null; if(!await saveDB({replaceUnreadable:true,clearLogs:true,reason:'clear'})) return; clearCheckin(); try{await window.jiadiClearDraft?.();}catch{}
         try{if(!SHARED)localStorage.removeItem(LOG_KEY);}catch(e){renderCurrent();toast('账本已清空，但操作日志清理失败：'+e.message);return;}
         PREF.lastExport=''; savePrefs(); renderCurrent(); toast('账本与操作日志已清空'); }
     });
@@ -3546,7 +3621,7 @@ function onbSteps(){
     pw:true,
     h:'先设一个应用密码',
     p:'已用飞牛 NAS 账号登录。再设一个<span class="em">应用密码</span>，它就是家底的最后一道门：连续 15 分钟没有操作会自动上锁，换浏览器或换设备打开时也要输入它才能看到账本。',
-    list:['4–8 位，且同时包含字母和数字','忘记后可以在应用里重设，账本数据不受影响','这一步不能跳过，否则账本等于没有锁']
+    list:['4–8 位，且同时包含字母和数字','忘了只能由 NAS 管理员在服务器上跑 scripts/reset-vault.mjs 清掉密码（账本数据不动），界面上不提供自助重置','这一步不能跳过，否则账本等于没有锁']
   });
   return steps.concat(ONB);
 }

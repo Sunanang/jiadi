@@ -57,5 +57,15 @@ export function normalizeData(o){
     money(Math.abs(a.net),'归档成员净额',Number.MAX_SAFE_INTEGER/100);
     return {id:text(a.id===undefined?'archived-'+i:a.id,'归档 ID',100),name:text(a.name,'归档成员名称',80),accounts:a.accounts,net:a.net,note:text(a.note===undefined?'':a.note,'归档备注')};
   });
-  return {v:1,accounts,members,archived,snapshots};
+  /* 净值目标（可选）：只影响展示，不参与任何金额校验 */
+  let goal;
+  if(o.goal!==undefined && o.goal!==null){
+    const g=o.goal;
+    if(!g || typeof g!=='object' || Array.isArray(g)) fail('净值目标格式无效');
+    const amount=money(g.amount===undefined?0:g.amount,'目标金额');
+    const year=Number.isInteger(g.year)?g.year:new Date().getFullYear();
+    if(year<2000||year>2100) fail('净值目标年份超出范围');
+    if(amount>0){ goal={year,amount}; const gname=text(g.name===undefined?'':g.name,'目标名称',60).trim(); if(gname) goal.name=gname; }
+  }
+  return {v:1,accounts,members,archived,snapshots,...(goal?{goal}:{})};
 }
