@@ -2686,6 +2686,9 @@ const SETTINGS = [
     { n:'—', name:'账户级属性', desc:'计入净值 / 参与提醒 / 是否负债 / 到期提醒 / 是否共同 —— 每账户独立，在账户抽屉里改', type:'readonly2', badge:'5 项' },
     { n:'—', name:'净值目标', desc:'年度目标写进账本，首页显示完成度、差额与达成节奏', type:'action', label:'设置', act:'goal' }
   ]},
+  { g:'提醒推送', meta:'按 cron 定时推到手机/群 · 纯文本 · 配置存服务端', items:[
+    { n:'—', name:'推送设置', desc:'渠道（企业微信 / 钉钉 / 飞书 / Bark / 魔法推送 / SMTP / PushPlus / 企微应用 / Webhook / MeoW）、cron 计划与试发', type:'action', label:'打开', act:'notify' }
+  ]},
   { g:'数据', meta:'服务端统一保存，电脑和手机共享', items:[
     { n:'—', name:'导出 JSON', desc:'验证应用密码后生成加密备份，导入时需导出密码', type:'action', label:'导出', act:'exportJson' },
     { n:'—', name:'导出 CSV', desc:'密码验证后加密导出，解密后可用 Excel 打开', type:'action', label:'导出', act:'exportCsv' },
@@ -2760,6 +2763,7 @@ function renderSettings(){
     const a = b.dataset.act;
     if(a === 'members') membersDrawer();
     else if(a === 'goal') goalDrawer();
+    else if(a === 'notify') notifyDrawer();
     else if(a === 'exportJson') exportJSON();
     else if(a === 'exportCsv') exportCSV();
     else if(a === 'importLedger') importLedger();
@@ -3237,6 +3241,69 @@ function backupDrawer(){
     body:`<div class="hint" style="padding:20px">本应用没有后台自动备份。${PREF.lastExport?'上次导出：'+esc(PREF.lastExport):'尚未导出备份'}。恢复时选择加密 JSON，并输入导出时的密码。CSV、报告、日志等导出件可用「设置 → 解密下载」还原成明文。</div>`,
     foot:'<button class="btn sm" id="backupExport">导出 JSON</button><button class="btn sm" id="backupImport">导入 JSON</button>'});
   $('#backupExport').onclick=exportJSON; $('#backupImport').onclick=importJSON;
+}
+/* 提醒推送：配置存在服务端 notify.json（不进账本），界面只回显掩码 */
+async function notifyDrawer(){
+  if(S.privacy){ toast('遮挡中，请先输入应用密码解除'); return; }
+  if(!SHARED){ toast('提醒推送需要共享账本服务（在飞牛应用里打开）'); return; }
+  let data;
+  try{ data = await SHARED.request('/api/notify'); }
+  catch(e){ toast('读取推送设置失败：' + e.message); return; }
+  const channels = data.channels || {}, metas = data.channelsMeta || [];
+  const rowOf = meta => {
+    const hint = meta.kind === 'url'
+      ? (meta.key === 'bark' ? 'https://api.day.app/你的设备key' : '机器人 Webhook 地址')
+      : 'JSON 参数，需包含 ' + meta.need.join(' / ') + '；多套用 | 分隔';
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+      <div style="font-size:13px;color:var(--ink)">${esc(meta.name)}</div>
+      <input class="sel" data-ch="${esc(meta.key)}" style="width:100%;height:32px;margin-top:6px"
+             value="${esc(channels[meta.key] || '')}" placeholder="${esc(hint)}" autocomplete="off" spellcheck="false">
+    </div>`;
+  };
+  const last = data.lastRun
+    ? '上次触发：' + esc(fmtLogTime(data.lastRun.at) || data.lastRun.at) + (data.lastRun.skipped ? '（没有异常，未发送）' : (data.lastRun.ok ? '（发送成功）' : '（发送失败）'))
+    : '还没有触发过';
+  openDrawer({ title:'提醒推送', sub:'纯文本 · 本月未盘点 / 超过阈值没更新 / 即将到期',
+    body:`<div style="padding:4px 20px 12px">
+      <div class="kv"><span class="k">启用定时推送</span><span class="v"><button class="switch ${data.enabled ? 'on' : ''}" id="notifyEnabled" aria-pressed="${!!data.enabled}" aria-label="启用定时推送"></button></span></div>
+      <label class="flabel" style="display:block;margin:14px 0 6px" for="notifyCron">cron 计划（分 时 日 月 周）</label>
+      <input class="sel" id="notifyCron" style="width:100%;height:32px;font-family:var(--num)" value="${esc(data.cron || '0 9 * * *')}" autocomplete="off" spellcheck="false">
+      <div class="hint" style="margin-top:6px">${esc(data.cronDescription || '')}${(data.next && data.next.length) ? ' · 下次 ' + esc(fmtLogTime(data.next[0]) || data.next[0]) : ''}</div>
+      <div class="hint">例：<code>0 9 * * *</code> 每天 9:00 · <code>30 8 * * 1</code> 每周一 8:30 · <code>0 10 1 * *</code> 每月 1 日 10:00 · <code>0 20 1 1,7 *</code> 每年 1 月与 7 月 1 日</div>
+      <div class="kv" style="margin-top:12px"><span class="k">没有异常也发一条</span><span class="v"><button class="switch ${data.sendWhenNothing ? 'on' : ''}" id="notifyAlways" aria-pressed="${!!data.sendWhenNothing}" aria-label="没有异常也发一条"></button></span></div>
+      <div class="hint" style="margin-top:10px">${last}</div>
+      <div class="sec" style="margin-top:14px">推送渠道（同一渠道可填多个，用 | 分隔）</div>
+      ${metas.map(rowOf).join('')}
+      <div class="hint" style="margin-top:10px">密钥只存在服务端的 notify.json（0600），不进账本；上面回显的是掩码，不动它保存就保持原值。</div>
+    </div>`,
+    foot:`<button class="btn sm primary" id="notifySave">保存</button><button class="btn sm" id="notifyTest">试发</button>` });
+  const swEnable = $('#notifyEnabled'), swAlways = $('#notifyAlways');
+  swEnable.onclick = () => { const on = swEnable.classList.toggle('on'); swEnable.setAttribute('aria-pressed', on); };
+  swAlways.onclick = () => { const on = swAlways.classList.toggle('on'); swAlways.setAttribute('aria-pressed', on); };
+  const collect = () => {
+    const channels = {};
+    $$('#drawerBody [data-ch]').forEach(el => { if(el.value.trim()) channels[el.dataset.ch] = el.value.trim(); });
+    return { enabled: swEnable.classList.contains('on'), sendWhenNothing: swAlways.classList.contains('on'),
+      cron: $('#notifyCron').value.trim(), channels };
+  };
+  $('#notifySave').onclick = async() => {
+    const payload = collect();
+    try{
+      const saved = await SHARED.request('/api/notify', { method:'PUT', body: payload });
+      closeDrawer(); logIt('保存推送设置', (saved.enabled ? '已启用 · ' : '未启用 · ') + saved.cron);
+      renderCurrent(); toast('推送设置已保存');
+    }catch(e){ toast('保存失败：' + e.message); }
+  };
+  $('#notifyTest').onclick = async() => {
+    toast('正在试发…');
+    try{
+      const result = await SHARED.request('/api/notify/test', { method:'POST', body:{} });
+      const bad = (result.results || []).filter(r => !r.ok);
+      logIt('试发推送', result.ok ? '成功' : ('失败：' + bad.map(r => r.channel + ' ' + r.detail).join('；')));
+      if(result.ok) toast('试发成功：' + (result.results || []).filter(r => r.ok).map(r => r.channel).join('、'));
+      else toast('试发失败：' + (bad.map(r => r.channel + ' ' + (r.detail || '')).join('；') || '没有可用渠道'));
+    }catch(e){ toast('试发失败：' + e.message); }
+  };
 }
 function snapshotDrawer(idx){
   if(S.privacy) return;
