@@ -5,7 +5,7 @@ import {mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve, dirname} from 'node:path';
 
-function chromeBinary(){
+export function chromeBinary(){
   if(process.env.CHROME_PATH)return process.env.CHROME_PATH;
   const absolute=[
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',

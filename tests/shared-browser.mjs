@@ -88,14 +88,30 @@ await test('cancelling an in-flight export does not download after its response 
   for(let i=0;i<100&&!release;i++)await new Promise(r=>setTimeout(r,10));
   check(!!release,'export request did not start');await a("$('#modalCancel').click()");release();await new Promise(r=>setTimeout(r,40));equal(await a('downloaded.length'),count);window.transport=original;
 });
+/* 加密备份的两条真实入口：v0.5.5 起是 importLedger（导入）与 decryptFile（解密下载），旧的 unlockBackup 已不存在 */
+async function pickOnce(envelope){
+  const code="(()=>{window.__pick=window.__pick||pickJsonFile;pickJsonFile=cb=>{setTimeout(()=>cb("+JSON.stringify(envelope)+"),0);};return true;})()";
+  await a(code);
+}
+const ledgerBackup={format:'jiadi.encrypted',name:'household.json',content:JSON.stringify({v:1,accounts:[{id:'cash',name:'共享现金',cat:'现金',member:'我',amount:777,prev:777,date:'2026-11-06',inNet:true,remind:true}],members:[{name:'我',color:'#2F4B6E'}],archived:[],snapshots:[]})};
 await test('encrypted ledger import validates password before presenting overwrite confirmation',async()=>{
-  await a("window.backupPromise=unlockBackup({format:'jiadi.encrypted'});void 0");
-  await a("(async()=>{$('#modalInput').value='wrong';await $('#modalOk').onclick();})()");check((await a("$('#modalErr').textContent")).includes('备份密码'),'missing decrypt error');
-  await a("(async()=>{$('#modalInput').value='backup1';await $('#modalOk').onclick();})()");equal(await a('backupPromise.then(data=>data.accounts[0].amount)'),150);
+  await pickOnce(ledgerBackup);await a('void importLedger()');await a('new Promise(r=>setTimeout(r,60))');
+  await a("(async()=>{$('#modalInput').value='wrong';await $('#modalOk').onclick();})()");
+  check((await a("$('#modalErr').textContent")).includes('备份密码'),'missing decrypt error');
+  equal(await a('TOT().N'),150);                                  // 密码错：一个数字都不许动
+  await a("(async()=>{$('#modalInput').value='backup1';await $('#modalOk').onclick();})()");
+  check((await a("$('#modalTitle').textContent")).includes('导入账本'),'decrypt did not reach the overwrite confirmation');
+  equal(await a('TOT().N'),150);                                  // 出现确认框时还没覆盖
+  await a("$('#modalCancel').click()");equal(await a('TOT().N'),150);
 });
 await test('encrypted CSV decrypts to its original downloadable spreadsheet',async()=>{
-  await a("window.backupPromise=unlockBackup({format:'jiadi.encrypted',name:'accounts.csv',content:'名称,余额'});void 0");
-  await a("(async()=>{$('#modalInput').value='backup1';await $('#modalOk').onclick();})()");equal(await a('downloaded.at(-1).name'),'accounts.csv');equal(await a('backupPromise'),null);
+  const before=await a('TOT().N');
+  await pickOnce({format:'jiadi.encrypted',name:'accounts.csv',content:'名称,余额'});
+  await a('void decryptFile()');await a('new Promise(r=>setTimeout(r,60))');
+  await a("(async()=>{$('#modalInput').value='backup1';await $('#modalOk').onclick();})()");
+  equal(await a('downloaded.at(-1).name'),'accounts.csv');
+  equal(await a('TOT().N'),before);                               // 解密下载绝不动账本
+  await a("pickJsonFile=window.__pick");
 });
 await test('shared reports use encrypted export rather than bypassing the password with print',async()=>{
   await a("show('report');$('#rpPrint').click()");check((await a("$('#modalTitle').textContent")).includes('加密导出'),'report export bypassed password');await a("$('#modalCancel').click()");
@@ -113,3 +129,22 @@ log(passed+' passed, '+failed+' failed');document.title=(failed?'FAIL: ':'PASS: 
 const dir=await mkdtemp(join(tmpdir(),'jiadi-shared-browser-')),path=join(dir,'runner.html');
 await writeFile(path,`<!doctype html><meta charset="utf-8"><title>共享账本回归</title><h1>共享账本浏览器测试</h1><pre id="results" style="white-space:pre-wrap"></pre><div id="frames"></div><script type="module">${runner.replaceAll('</script','<\\/script')}</script>`);
 console.log(path);
+// 自证：用无头 Chrome 打开 runner.html，按 <title> 判定通过与否（CI 必须过；没有浏览器时直接报错退出）
+let dom='';
+try{
+  const {chromeBinary}=await import('./browser.mjs');
+  const {execFileSync}=await import('node:child_process');
+  dom=execFileSync(chromeBinary(),['--headless=new','--disable-gpu','--no-sandbox','--allow-file-access-from-files','--virtual-time-budget=60000','--dump-dom','file://'+path],{encoding:'utf8',maxBuffer:64*1024*1024,stdio:['ignore','pipe','ignore']});
+}catch(e){
+  console.error('共享账本用例需要浏览器，但启动失败：'+String((e&&e.message)||e).split('\n')[0]);
+  console.error('已生成的 runner 可手动打开：'+path);
+  process.exit(1);
+}
+const title=(dom.match(/<title>([^<]*)<\/title>/)||[])[1]||'';
+const results=(dom.match(/<pre id="results"[^>]*>([\s\S]*?)<\/pre>/)||[])[1]||'';
+if(!title.startsWith('PASS:')){
+  console.error('共享账本浏览器用例未全通过：'+(title||'未写出标题'));
+  console.error(results.replace(/<[^>]+>/g,'').trim().slice(-1500));
+  process.exit(1);
+}
+console.log(title);
