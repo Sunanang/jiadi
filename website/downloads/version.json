@@ -1,13 +1,13 @@
 {
-  "tag": "v0.5.8",
-  "name": "家底 v0.5.8",
+  "tag": "v0.5.9",
+  "name": "家底 v0.5.9",
   "publishedAt": "2026-11-24",
-  "releasePage": "https://github.com/Sunanang/jiadi/releases/tag/v0.5.8",
+  "releasePage": "https://github.com/Sunanang/jiadi/releases/tag/v0.5.9",
   "assets": [
     {
-      "name": "jiadi-0.5.8-fnos-all.fpk",
-      "size": 241770,
-      "sha256": "9466c3c7527ff5caa008995b8282f5df173ff3c40b1dc32d043ae26b1316477b"
+      "name": "jiadi-0.5.9-fnos-all.fpk",
+      "size": 245089,
+      "sha256": "07fb565b771c40afdc2a0c5151d2be6e108f5232ea2f0492aa5893150453fa5e"
     }
   ]
 }
