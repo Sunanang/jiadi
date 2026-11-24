@@ -449,8 +449,18 @@ test('推送内容只讲条数与差额，不带具体金额', async()=>{
   assert.match(digest.content,/2026-11 盘点：还没盘/);
   assert.match(digest.content,/超过 45 天没更新的账户：1 个/);
   assert.match(digest.content,/未来 30 天内到期：1 个/);
+  assert.match(digest.content,/净值较上期：/);
   assert.equal(/¥/.test(digest.content),false,'推送正文不许带金额符号');
   assert.match(digest.title,/家底/);
+});
+
+test('缺月快照时推送写明对比月份，不用含糊的「上期」', ()=>{
+  const ledger={v:1,accounts:[
+    {id:'a',name:'现金',cat:'现金',member:'我',amount:400,prev:250,date:'2026-11-01'},
+  ],members:[{name:'我'}],archived:[],snapshots:[{month:'2026-08',A:250,L:0},{month:'2026-11',A:400,L:0}]};
+  const digest=buildDigest(ledger,new Date('2026-11-23T09:00:00'));
+  assert.match(digest.content,/净值较 2026-08：/);
+  assert.equal(/净值较上期/.test(digest.content),false);
 });
 
 test('推送配置存在服务端 notify.json（0600），密钥不回前端，锁定态不可读', async t=>{
@@ -496,6 +506,54 @@ test('试发把纯文本发到已配置渠道', async t=>{
   }finally{ globalThis.fetch=original; }
 });
 
+test('行式渠道可关开关仍保留，定时只发启用的', async t=>{
+  const {dataDir,request,login}=await fixture(t);
+  const client=await login('abc1',true);
+  const saved=await request('PUT','/api/notify',{
+    enabled:true,cron:'0 9 * * *',
+    items:[
+      {key:'wechat',value:'https://example.com/on',enabled:true},
+      {key:'dingtalk',value:'https://example.com/off',enabled:false},
+    ]
+  },client);
+  assert.equal(saved.status,200,JSON.stringify(saved.data));
+  const stored=JSON.parse(await readFile(join(dataDir,'notify.json'),'utf8'));
+  assert.equal(stored.channels.wechat,'https://example.com/on');
+  assert.equal(stored.channels.dingtalk,undefined,'关闭的渠道不进定时发送表');
+  assert.equal(stored.items.length,2);
+  assert.equal(stored.items[1].enabled,false);
+  assert.equal(stored.items[1].value,'https://example.com/off');
+  const got=await request('GET','/api/notify',undefined,client);
+  assert.equal(got.data.items.length,2);
+  assert.match(got.data.items[0].value,/…/);
+});
+
+test('试发可用抽屉未保存渠道，不覆盖 notify.json', async t=>{
+  const {dataDir,request,login}=await fixture(t);
+  const client=await login('abc1',true);
+  await request('PUT','/api/notify',{enabled:false,cron:'0 9 * * *',channels:{wechat:'https://example.com/saved'}},client);
+  const calls=[];
+  const original=globalThis.fetch;
+  globalThis.fetch=async(url)=>{calls.push(String(url));return {status:200,async json(){return {errcode:0};}};};
+  try{
+    const res=await request('POST','/api/notify/test',{channels:{wechat:'https://example.com/draft'}},client);
+    assert.equal(res.status,200,JSON.stringify(res.data));
+    assert.equal(calls.length,1);
+    assert.equal(calls[0],'https://example.com/draft');
+    const stored=JSON.parse(await readFile(join(dataDir,'notify.json'),'utf8'));
+    assert.equal(stored.channels.wechat,'https://example.com/saved','试发不得改落盘配置');
+  }finally{ globalThis.fetch=original; }
+});
+
+test('解密成功不重置登录失败预算', async t=>{
+  const f=await fixture(t),client=await f.login('abc1',true);
+  const backup=(await f.request('POST','/api/export',{password:'abc1',content:'{}',name:'b.json',revision:0},client)).data;
+  for(let i=0;i<7;i++)assert.equal((await f.request('POST','/api/verify',{password:'bad'},client)).status,401);
+  assert.equal((await f.request('POST','/api/decrypt',{password:'abc1',backup},client)).status,200);
+  assert.equal((await f.request('POST','/api/verify',{password:'bad'},client)).status,401);
+  assert.equal((await f.request('POST','/api/verify',{password:'abc1'},client)).status,429,'解密成功不得清掉登录失败计数');
+});
+
 test('定时器到点发一次，同一分钟不重复发', async t=>{
   const fixed=new Date('2026-11-23T09:00:00');
   process.env.JIADI_NOTIFY_TICK_MS='40';
@@ -513,5 +571,29 @@ test('定时器到点发一次，同一分钟不重复发', async t=>{
     assert.match(String(stored.lastRun.minute),/^2026-11-23T/);
     assert.equal(stored.lastRun.ok,true);
     assert.equal(stored.lastRun.skipped,false);
+  }finally{ globalThis.fetch=original; }
+});
+
+test('定时推送失败后同一分钟会限量重试，成功后不再发', async t=>{
+  const fixed=new Date('2026-11-23T09:00:00');
+  process.env.JIADI_NOTIFY_TICK_MS='40';
+  t.after(()=>{delete process.env.JIADI_NOTIFY_TICK_MS;});
+  const {dataDir,request,login}=await fixture(t,{now:()=>fixed.getTime()});
+  const client=await login('abc1',true);
+  let n=0;
+  const original=globalThis.fetch;
+  globalThis.fetch=async()=>{
+    n++;
+    if(n===1) return {status:500,async json(){return {errcode:1,errmsg:'boom'};}};
+    return {status:200,async json(){return {errcode:0};}};
+  };
+  try{
+    await request('PUT','/api/notify',{enabled:true,cron:'0 9 * * *',channels:{wechat:'https://example.com/hook'}},client);
+    await new Promise(r=>setTimeout(r,500));
+    assert.ok(n>=2,'失败后应重试，实际调用 '+n);
+    assert.ok(n<=3,'同一分钟最多 3 次，实际 '+n);
+    const stored=JSON.parse(await readFile(join(dataDir,'notify.json'),'utf8'));
+    assert.equal(stored.lastRun.ok,true);
+    assert.equal(stored.lastRun.attempts,2);
   }finally{ globalThis.fetch=original; }
 });

@@ -153,7 +153,23 @@ export function isMasked(value) {
   return typeof value === 'string' && value.includes('…');
 }
 
-/** 校验 + 生成待存配置：把每个渠道的原始值规整成字符串（多套用 | 分隔） */
+function validateChannelPiece(meta, piece) {
+  if (meta.kind === 'url') {
+    let u;
+    try { u = new URL(piece); } catch { throw new Error(meta.name + ' 的地址不是合法 URL'); }
+    if (!/^https?:$/.test(u.protocol)) throw new Error(meta.name + ' 只支持 http/https 地址');
+    return;
+  }
+  let obj;
+  try { obj = JSON.parse(piece); } catch { throw new Error(meta.name + ' 的参数必须是 JSON 对象'); }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error(meta.name + ' 的参数必须是 JSON 对象');
+  for (const need of meta.need || []) {
+    if (!obj[need]) throw new Error(meta.name + ' 缺少 ' + need);
+  }
+}
+
+/** 校验 + 生成待存配置：把每个渠道的原始值规整成字符串（多套用 | 分隔）
+ *  可选 items:[{key,value,enabled}] —— 对齐日志推送「按行添加 / 关开关仍保留」 */
 export function normalizeNotifyConfig(input = {}) {
   const cfg = {
     enabled: !!input.enabled,
@@ -161,27 +177,29 @@ export function normalizeNotifyConfig(input = {}) {
     channels: {},
   };
   parseCron(cfg.cron);
-  const channels = input.channels || {};
-  for (const [key, value] of Object.entries(channels)) {
-    const meta = BY_KEY.get(key);
-    if (!meta) continue;
-    const text = String(value == null ? '' : value).trim();
-    if (!text) continue;
-    for (const piece of splitMulti(text)) {
-      if (meta.kind === 'url') {
-        let u;
-        try { u = new URL(piece); } catch { throw new Error(meta.name + ' 的地址不是合法 URL'); }
-        if (!/^https?:$/.test(u.protocol)) throw new Error(meta.name + ' 只支持 http/https 地址');
-      } else {
-        let obj;
-        try { obj = JSON.parse(piece); } catch { throw new Error(meta.name + ' 的参数必须是 JSON 对象'); }
-        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error(meta.name + ' 的参数必须是 JSON 对象');
-        for (const need of meta.need || []) {
-          if (!obj[need]) throw new Error(meta.name + ' 缺少 ' + need);
-        }
-      }
+  if (Array.isArray(input.items)) {
+    cfg.items = [];
+    for (const raw of input.items) {
+      const key = raw && raw.key;
+      const meta = BY_KEY.get(key);
+      if (!meta) continue;
+      const text = String(raw.value == null ? '' : raw.value).trim();
+      if (!text) continue;
+      validateChannelPiece(meta, text);
+      const enabled = raw.enabled !== false;
+      cfg.items.push({ key, value: text, enabled });
+      if (enabled) cfg.channels[key] = cfg.channels[key] ? (cfg.channels[key] + '|' + text) : text;
     }
-    cfg.channels[key] = text;
+  } else {
+    const channels = input.channels || {};
+    for (const [key, value] of Object.entries(channels)) {
+      const meta = BY_KEY.get(key);
+      if (!meta) continue;
+      const text = String(value == null ? '' : value).trim();
+      if (!text) continue;
+      for (const piece of splitMulti(text)) validateChannelPiece(meta, piece);
+      cfg.channels[key] = text;
+    }
   }
   if (cfg.enabled && !Object.keys(cfg.channels).length) throw new Error('至少配置一个推送渠道');
   return cfg;
@@ -196,6 +214,44 @@ export function mergeMaskedChannels(previous = {}, incoming = {}) {
     else out[key] = String(value).trim();
   }
   return out;
+}
+
+/** 行式渠道：掩码行按同下标同 key 回填旧值 */
+export function mergeMaskedItems(previous = [], incoming = []) {
+  const prev = Array.isArray(previous) ? previous : [];
+  const used = new Set();
+  return (Array.isArray(incoming) ? incoming : []).map((it, i) => {
+    const key = it && it.key;
+    let value = String((it && it.value) == null ? '' : it.value).trim();
+    if (isMasked(value)) {
+      let hit = null;
+      if (prev[i] && prev[i].key === key && !used.has(i)) { hit = prev[i].value; used.add(i); }
+      else {
+        const j = prev.findIndex((p, idx) => p && p.key === key && !used.has(idx));
+        if (j >= 0) { hit = prev[j].value; used.add(j); }
+      }
+      if (hit) value = hit;
+    }
+    return { key, value, enabled: !it || it.enabled !== false };
+  }).filter(it => it.key && it.value);
+}
+
+/** 旧版只有 channels 对象时，展开成行（全部启用） */
+export function expandChannelItems(channels = {}) {
+  const items = [];
+  for (const [key, value] of Object.entries(channels || {})) {
+    if (!BY_KEY.has(key) || value == null || String(value).trim() === '') continue;
+    for (const piece of splitMulti(String(value))) items.push({ key, value: piece, enabled: true });
+  }
+  return items;
+}
+
+export function maskItems(items = []) {
+  return (Array.isArray(items) ? items : []).map(it => ({
+    key: it.key,
+    value: maskConfig({ [it.key]: it.value })[it.key] || it.value,
+    enabled: it.enabled !== false,
+  }));
 }
 
 /* ---------------- 报文 ---------------- */
@@ -342,27 +398,44 @@ async function sendMail(params, message) {
 
   let socket = secure ? tls.connect({ host, port, servername: host }) : net.connect({ host, port });
   const expect = (code) => new Promise((resolve, reject) => {
-    let buf = '';
+    let buf = '', settled = false;
+    const done = (err, ok) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.removeListener('data', onData);
+      socket.removeListener('error', onErr);
+      if (err || ok instanceof Error) reject(err || ok);
+      else resolve(ok);
+    };
+    const timer = setTimeout(() => done(new Error('SMTP 超时')), 15000);
+    timer.unref?.();
     const onData = chunk => {
       buf += chunk.toString('utf8');
       const lines = buf.split('\r\n').filter(Boolean);
       const last = lines[lines.length - 1] || '';
+      /* 多行应答以「码+空格」收尾（如 250-… / 250 OK）；码后带 - 的是中间行 */
       if (/^\d{3} /.test(last)) {
-        socket.removeListener('data', onData);
-        buf = '';
-        String(last).startsWith(String(code)) ? resolve(last) : reject(new Error('SMTP 期待 ' + code + '，得到 ' + last));
+        done(null, String(last).startsWith(String(code)) ? last : new Error('SMTP 期待 ' + code + '，得到 ' + last));
       }
     };
+    const onErr = err => done(err);
     socket.on('data', onData);
-    socket.once('error', reject);
-    setTimeout(() => reject(new Error('SMTP 超时')), 15000).unref?.();
+    socket.on('error', onErr);
   });
-  const write = line => new Promise(r => socket.write(line + '\r\n', r));
+  const write = line => new Promise((r, j) => socket.write(line + '\r\n', e => e ? j(e) : r()));
+  const waitUp = event => new Promise((res, rej) => { socket.once(event, res); socket.once('error', rej); });
   try {
-    await new Promise((res, rej) => { socket.once(secure ? 'secureConnect' : 'connect', res); socket.once('error', rej); });
+    await waitUp(secure ? 'secureConnect' : 'connect');
     await expect(220);
     await write('EHLO jiadi'); await expect(250);
-    if (!secure) { await write('STARTTLS'); await expect(220); socket = tls.connect({ socket, servername: host }); await expect(220).catch(() => {}); await write('EHLO jiadi'); await expect(250); }
+    if (!secure) {
+      /* STARTTLS：220 后升级套接字；TLS 握手完成即可 EHLO，服务端不会再发一轮 220 */
+      await write('STARTTLS'); await expect(220);
+      socket = tls.connect({ socket, servername: host });
+      await waitUp('secureConnect');
+      await write('EHLO jiadi'); await expect(250);
+    }
     if (user) {
       await write('AUTH LOGIN'); await expect(334);
       await write(Buffer.from(user).toString('base64')); await expect(334);
@@ -404,14 +477,23 @@ export function buildDigest(ledger, now = new Date(), opts = {}) {
   }).length;
   const counted = accounts.filter(a => !a.closed && a.inNet !== false);
   const net = counted.reduce((sum, a) => sum + Math.round((a.isDebt ? -1 : 1) * a.amount * 100), 0) / 100;
-  const last = snapshots.slice().sort((a, b) => String(a.month).localeCompare(String(b.month))).pop();
-  const delta = last ? net - (last.A - last.L) : null;
+  /* 对比「当前月之前」最近一期快照；缺月时文案标出具体月份，避免「上期」误导 */
+  const prevSnap = snapshots
+    .filter(s => String(s.month) < ym)
+    .sort((a, b) => String(a.month).localeCompare(String(b.month)))
+    .pop();
+  const delta = prevSnap ? net - (prevSnap.A - prevSnap.L) : null;
+  const [yy, mm] = ym.split('-').map(Number);
+  const adjacentMonth = mm === 1 ? (yy - 1) + '-12' : yy + '-' + String(mm - 1).padStart(2, '0');
 
   const lines = [];
   lines.push(ym + ' 盘点：' + (checkinMissing ? '还没盘' : '已盘点'));
   if (stale) lines.push('超过 ' + staleDays + ' 天没更新的账户：' + stale + ' 个');
   if (dueSoon) lines.push('未来 ' + lead + ' 天内到期：' + dueSoon + ' 个');
-  if (delta !== null) lines.push('净值较上期：' + (delta >= 0 ? '+' : '') + (Math.round(delta * 100) / 100));
+  if (delta !== null) {
+    const label = String(prevSnap.month) === adjacentMonth ? '净值较上期' : ('净值较 ' + prevSnap.month);
+    lines.push(label + '：' + (delta >= 0 ? '+' : '') + (Math.round(delta * 100) / 100));
+  }
   lines.push('（登录家底查看明细）');
   const nothing = !checkinMissing && !stale && !dueSoon;
   return {
