@@ -47,7 +47,36 @@ with open(os.path.join(out_dir, "version.json"), "w", encoding="utf-8") as f:
 print("version.json:", data["tag"], "→", ", ".join(a["name"] for a in data["assets"]))
 '
 
+# 2) 把官网 HTML 里的静态兜底值也改掉。
+# 这一步必须自动做：scripts 里会删掉旧版本的包，如果 index.html 还指着旧文件名，
+# 一旦 version.json 拉不到（无脚本、断网、首帧未水合）下载按钮就成了 404。
+python3 - <<'PY'
+import json, re, sys
+
+data = json.load(open("website/downloads/version.json", encoding="utf-8"))
+assets = [a for a in data.get("assets", []) if a.get("name", "").endswith(".fpk")]
+if not assets:
+    sys.exit("官网同步失败：version.json 里没有安装包记录")
+asset = assets[-1]
+tag, name, sha, date = data["tag"], asset["name"], asset["sha256"], data["publishedAt"]
+
+path = "website/index.html"
+html = open(path, encoding="utf-8").read()
+edits = [
+    (r"<b>v[0-9][0-9.]*</b>(?= · 开源 · 零依赖)", "<b>%s</b>" % tag, 1),
+    (r'(href=")downloads/[^"]*\.fpk(")', "\\g<1>downloads/%s\\g<2>" % name, 2),
+    (r"<span data-ver>v[0-9][0-9.]*</span>", "<span data-ver>%s</span>" % tag, 1),
+    (r"<span data-date>[0-9][0-9-]*</span>", "<span data-date>%s</span>" % date, 1),
+    (r'<code data-name="all">[^<]*</code>', '<code data-name="all">%s</code>' % name, 1),
+    (r"<pre data-sha>[^<]*</pre>", "<pre data-sha>%s  %s</pre>" % (sha, name), 1),
+]
+for pattern, repl, expected in edits:
+    html, hits = re.subn(pattern, repl, html)
+    if hits != expected:
+        sys.exit("官网静态兜底改写失败：%s 命中 %d 次，预期 %d 次" % (pattern, hits, expected))
+open(path, "w", encoding="utf-8").write(html)
+print("index.html 静态兜底已同步到", tag, "→", name)
+PY
+
 echo
-echo "页面里的兜底版本号（HTML 静态值）如需同步，改 website/index.html 里的 data-ver / data-date / data-name 默认值；"
-echo "运行时若有 version.json，页面会自动覆盖成最新值，所以不改也能正确显示。"
 echo "别忘了提交： git add website/downloads website/index.html"

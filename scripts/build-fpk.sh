@@ -29,6 +29,10 @@ rsync -a --exclude '.DS_Store' --exclude '*.fpk' --exclude 'app/server.mjs' --ex
 # Runtime files live at TRIM_APPDEST root (fnpack extracts app/).
 cp "$ROOT/server.mjs" "$ROOT/ledger-domain.mjs" "$ROOT/shared-client.js" "$ROOT/jiadi-ui.html" "$ROOT/package.json" \
   "$PAYLOAD/app/"
+# 忘记密码时的离线恢复工具要随包走：装到 /vol1/@appcenter/jiadi/ 之后管理员才能就地运行
+cp "$ROOT/notify.mjs" "$PAYLOAD/app/notify.mjs"
+cp "$ROOT/scripts/reset-vault.mjs" "$PAYLOAD/app/reset-vault.mjs"
+chmod +x "$PAYLOAD/app/reset-vault.mjs"
 
 chmod +x "$PAYLOAD"/cmd/*
 

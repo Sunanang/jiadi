@@ -6,6 +6,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {randomBytes, scrypt as scryptCallback, pbkdf2 as pbkdf2Callback, timingSafeEqual, createCipheriv, createDecipheriv} from 'node:crypto';
 import {promisify} from 'node:util';
 import {normalizeData} from './ledger-domain.mjs';
+import {CHANNELS, DEFAULT_NOTIFY, normalizeNotifyConfig, mergeMaskedChannels, mergeMaskedItems, expandChannelItems, maskItems, maskConfig, describeCron, nextRuns, cronMatches, sendAll, buildDigest} from './notify.mjs';
 
 const scrypt=promisify(scryptCallback),pbkdf2=promisify(pbkdf2Callback), root=dirname(fileURLToPath(import.meta.url));
 const empty=()=>({v:1,accounts:[],members:[],archived:[],snapshots:[]});
@@ -127,6 +128,62 @@ export async function createLedgerApp({
       disk.ledger=normalizeData(disk.ledger);
     }catch(e){if(e.code==='ENOENT')disk={v:1,revision:0,vault:null,ledger:empty(),logs:[]};else throw e;}
   }catch(e){await lock.close();await unlink(lockPath);throw new Error('无法读取共享账本，原始文件未覆盖：'+e.message);}
+  /* 提醒推送配置：存 notify.json（0600），不进账本 —— 账本会下发给每个客户端，渠道密钥不能跟着走。 */
+  const notifyPath=join(dataDir,'notify.json');
+  let notify={...DEFAULT_NOTIFY,channels:{}};
+  try{
+    const raw=JSON.parse(await readFile(notifyPath,'utf8'));
+    notify={...DEFAULT_NOTIFY,...raw,channels:(raw&&raw.channels)||{}};
+  }catch(e){ if(e.code!=='ENOENT') console.error('[提醒推送] 配置读取失败：'+e.message); }
+  async function persistNotify(next){
+    const tmp=notifyPath+'.tmp-'+process.pid;
+    const fh=await open(tmp,'w',0o600);
+    try{ await fh.writeFile(JSON.stringify(next,null,2),'utf8'); await fh.sync(); } finally { await fh.close(); }
+    await rename(tmp,notifyPath);
+    notify=next;
+  }
+  const NOTIFY_MESSAGE_TIMEOUT=15000;
+  const notifyTickMs=Number(process.env.JIADI_NOTIFY_TICK_MS)||30000;
+  const NOTIFY_RETRY_MAX=3;   // 同一 cron 分钟内发送失败最多再试几次（配合 tick，避免网络抖动丢当日提醒）
+  let notifyInFlight=false;
+  async function runScheduledNotify(){
+    if(notifyInFlight) return;
+    if(!notify.enabled) return;
+    if(!Object.keys(notify.channels||{}).length) return;
+    const when=new Date(now());
+    let matched=false;
+    try{ matched=cronMatches(notify.cron,when); }catch(e){ console.error('[提醒推送] cron 无效：'+e.message); return; }
+    if(!matched) return;
+    const minuteKey=when.toISOString().slice(0,16);
+    const prev=notify.lastRun;
+    if(prev && prev.minute===minuteKey){
+      if(prev.ok || prev.skipped) return;                          // 成功或主动跳过：本分钟不再发
+      if((prev.attempts||0) >= NOTIFY_RETRY_MAX) return;           // 失败已达重试上限
+    }
+    const attempts=(prev && prev.minute===minuteKey ? (prev.attempts||0) : 0) + 1;
+    notifyInFlight=true;
+    try{
+      /* 占坑防并发；失败时 ok:false 且 attempts<上限，下一 tick 可重试 */
+      notify={...notify,lastRun:{minute:minuteKey,at:when.toISOString(),ok:false,skipped:false,attempts,results:[],facts:null}};
+      const digest=buildDigest(disk.ledger,when);
+      const commitLastRun=async lastRun=>{
+        notify={...notify,lastRun};
+        try{ await persistNotify(notify); }
+        catch(e){ console.error('[提醒推送] 记录 lastRun 失败：'+((e&&e.message)||e)); }
+      };
+      if(digest.nothingToDo && !notify.sendWhenNothing){
+        await commitLastRun({minute:minuteKey,at:when.toISOString(),ok:true,skipped:true,attempts,results:[],facts:digest.facts});
+        return;
+      }
+      const result=await sendAll(notify.channels,{...digest,time:when.toISOString()});
+      await commitLastRun({minute:minuteKey,at:when.toISOString(),ok:result.ok,skipped:false,attempts,facts:digest.facts,
+        results:result.results.map(r=>({channel:r.channel,ok:r.ok,detail:String(r.detail||'').slice(0,200)}))});
+      if(!result.ok) console.error('[提醒推送] 发送失败（'+attempts+'/'+NOTIFY_RETRY_MAX+'）：'+result.results.filter(r=>!r.ok).map(r=>r.channel+':'+r.detail).join('；'));
+    }finally{ notifyInFlight=false; }
+  }
+  const notifyTimer=setInterval(()=>{ runScheduledNotify().catch(e=>console.error('[提醒推送] '+((e&&e.message)||e))); },notifyTickMs);
+  notifyTimer.unref?.();
+
   /* 安装向导填了应用密码时，cmd/install_callback 只把密码写进 data/.pwseed（0600）。
      加盐哈希始终由这里生成（makeVault），保证哈希参数只有一份实现；seed 用完立即删除，
      不在磁盘上长期保留明文密码。已存在 vault 或密码不合规时也删掉 seed，避免残留。 */
@@ -447,10 +504,17 @@ export async function createLedgerApp({
       }
       if(route==='/api/decrypt'&&req.method==='POST'){
         const input=await body(req);const address=req.socket?.remoteAddress||'local';
-        const row=attempts.get(address);if(row&&row.until>now()&&row.count>=8)throw fail(429,'密码尝试过多，请一分钟后再试');
-        attempts.set(address,{count:row&&row.until>now()?row.count+1:1,until:row&&row.until>now()?row.until:now()+60000});
-        const payload=await decryptBackup(input.backup,input.password);   // 解密失败会计入预算，成功则清零
-        attempts.delete(address);
+        for(const [key,row] of attempts)if(row.until<now())attempts.delete(key);
+        const row=attempts.get(address);
+        if(row&&row.until>now()&&row.count>=8)throw fail(429,'密码尝试过多，请一分钟后再试');
+        let payload;
+        try{ payload=await decryptBackup(input.backup,input.password); }
+        catch(e){
+          /* 失败才计入；成功不清理——与登录/解锁共用计数器，避免用导出密码重置暴力尝试窗口 */
+          const cur=attempts.get(address);
+          attempts.set(address,{count:cur&&cur.until>now()?cur.count+1:1,until:cur&&cur.until>now()?cur.until:now()+60000});
+          throw e;
+        }
         reply(res,200,payload,authHeaders);return;
       }
       if(route==='/api/log'&&['POST','DELETE'].includes(req.method)){
@@ -461,6 +525,62 @@ export async function createLedgerApp({
           await persist({...disk,logs:rows});return rows;
         });reply(res,200,{logs},authHeaders);return;
       }
+      if(route==='/api/notify'&&req.method==='GET'){
+        if(isLocked(s))throw fail(423,'账本已锁定，请输入密码解锁');
+        const items=Array.isArray(notify.items)?notify.items:expandChannelItems(notify.channels);
+        reply(res,200,{
+          enabled:notify.enabled,
+          cron:notify.cron,
+          cronDescription:describeCron(notify.cron),
+          next:nextRuns(notify.cron,new Date(now())).map(d=>d.toISOString()),
+          sendWhenNothing:!!notify.sendWhenNothing,
+          channels:maskConfig(notify.channels),
+          items:maskItems(items),
+          channelsMeta:CHANNELS.map(c=>({key:c.key,name:c.name,kind:c.kind,need:c.need||[]})),
+          lastRun:notify.lastRun||null
+        },authHeaders);return;
+      }
+      if(route==='/api/notify'&&req.method==='PUT'){
+        if(isLocked(s))throw fail(423,'账本已锁定，请输入密码解锁');
+        const input=await body(req);
+        let next;
+        try{
+          if(Array.isArray(input.items)){
+            const prevItems=Array.isArray(notify.items)?notify.items:expandChannelItems(notify.channels);
+            const mergedItems=mergeMaskedItems(prevItems,input.items);
+            next=normalizeNotifyConfig({enabled:!!input.enabled,cron:input.cron,items:mergedItems});
+          }else{
+            const merged=mergeMaskedChannels(notify.channels,input.channels||{});
+            next=normalizeNotifyConfig({enabled:!!input.enabled,cron:input.cron,channels:merged});
+          }
+        }catch(e){ throw fail(400,e.message); }
+        next.sendWhenNothing=!!input.sendWhenNothing;
+        next.lastRun=notify.lastRun||null;
+        await persistNotify(next);
+        reply(res,200,{ok:true,enabled:next.enabled,cron:next.cron,cronDescription:describeCron(next.cron),next:nextRuns(next.cron,new Date(now())).map(d=>d.toISOString()),channels:maskConfig(next.channels),items:maskItems(next.items||expandChannelItems(next.channels))},authHeaders);return;
+      }
+      if(route==='/api/notify/test'&&req.method==='POST'){
+        if(isLocked(s))throw fail(423,'账本已锁定，请输入密码解锁');
+        const input=await body(req);
+        /* 试发用抽屉里当前填写（含未保存），掩码字段合并服务端已存密钥；不落盘 */
+        let channels;
+        try{
+          if(Array.isArray(input.items)){
+            const prevItems=Array.isArray(notify.items)?notify.items:expandChannelItems(notify.channels);
+            const mergedItems=mergeMaskedItems(prevItems,input.items);
+            channels=normalizeNotifyConfig({enabled:false,cron:input.cron||notify.cron||DEFAULT_NOTIFY.cron,items:mergedItems}).channels;
+          }else{
+            const merged=mergeMaskedChannels(notify.channels,input.channels||{});
+            channels=normalizeNotifyConfig({enabled:false,cron:input.cron||notify.cron||DEFAULT_NOTIFY.cron,channels:merged}).channels;
+          }
+        }catch(e){ throw fail(400,e.message); }
+        if(!Object.keys(channels).length)throw fail(400,'还没有配置推送渠道');
+        const when=new Date(now());
+        const digest=buildDigest(disk.ledger,when);
+        const message={title:'家底 · 测试推送',content:'这是一条测试消息，收到即说明渠道可用。\n'+digest.content,time:when.toISOString()};
+        const result=await sendAll(channels,message);
+        reply(res,200,{ok:result.ok,results:result.results.map(r=>({channel:r.channel,ok:r.ok,detail:String(r.detail||'').slice(0,160)}))},authHeaders);return;
+      }
       throw fail(404,'接口不存在');
     }catch(e){
       /* 早拒绝（锁定 423、CSRF 403、路由 404 等）发生在读请求体之前：此时还有大量上传数据在途，
@@ -470,7 +590,7 @@ export async function createLedgerApp({
       reply(res,e.status||500,{error:e.status?e.message:'保存或读取失败，请检查服务端数据目录后重试'});
     }
   }
-  return {handler,async close(){closed=true;await queue;await lock.close();await unlink(lockPath);}};
+  return {handler,async close(){closed=true;clearInterval(notifyTimer);await queue;await lock.close();await unlink(lockPath);}};
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

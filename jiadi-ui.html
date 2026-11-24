@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>家底 · 资产台账</title>
+<link rel="icon" href="data:," />
 <style>
   *{box-sizing:border-box}
   :root{
@@ -119,16 +120,21 @@
 
   .sel{
     font:inherit;font-size:12.5px;color:var(--ink);
-    border:1px solid var(--line-2);background:var(--field);border-radius:6px;
-    padding:5px 24px 5px 10px;cursor:pointer;
+    border:1px solid var(--line-2);background-color:var(--field);border-radius:6px;
+    padding:5px 10px;cursor:pointer;
     appearance:none;-webkit-appearance:none;-moz-appearance:none;
-    background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A6B80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;background-position:right 7px center;background-size:12px 12px;
     transition:border-color .14s var(--ease),box-shadow .14s var(--ease),background-color .14s var(--ease);
   }
-  [data-theme="dark"] .sel{
+  /* 只有下拉框才画箭头；普通 input/textarea 不要箭头 */
+  select.sel{
+    padding-right:24px;
+    background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A6B80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 7px center;background-size:12px 12px;
+  }
+  [data-theme="dark"] select.sel{
     background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23A5B3C4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   }
+  input.sel,textarea.sel{cursor:text}
   .sel:hover{background-color:var(--raised-2)}
   .sel:focus{outline:none;border-color:var(--asset);box-shadow:0 0 0 3px rgba(74,123,167,.12)}
   .tabs{display:inline-flex;gap:2px;background:var(--raised);border-radius:8px;padding:2px}
@@ -308,6 +314,25 @@
   .drawer-b{flex:1 1 auto;overflow:auto;padding:4px 0 20px}
   .drawer-f{padding:12px 20px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}
   .sec{padding:14px 20px 4px;font-size:11.5px;color:var(--mut)}
+  /* 提醒推送渠道表（对齐「日志推送 / FnMessageBot」：按需添加行，不一次列全渠道） */
+  .ch-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 20px 6px}
+  .ch-head .sec{padding:0}
+  .ch-add{border:0;border-radius:999px;background:var(--solid);color:var(--on-solid);font:inherit;font-size:12px;padding:4px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;flex:none}
+  .ch-add:hover{background:var(--solid-hover)}
+  .ch-wrap{padding:0 12px 4px;overflow-x:auto}
+  .ch-table{width:100%;border-collapse:collapse;min-width:360px}
+  .ch-table th,.ch-table td{padding:8px 6px;font-size:12.5px;text-align:left;vertical-align:top}
+  .ch-table thead th{color:var(--mut);font-weight:500;border-bottom:1px solid var(--line)}
+  .ch-table tbody tr:not(:last-child) td{border-bottom:1px solid var(--line)}
+  .ch-table tr.is-off td:not(.ch-ops){opacity:.55}
+  .ch-table select.sel,.ch-table input.sel,.ch-table textarea.sel{width:100%;min-height:32px;font-size:12.5px}
+  .ch-table textarea.sel{min-height:64px;resize:vertical;padding:8px 10px;line-height:1.4}
+  .ch-ops{text-align:center;vertical-align:middle;white-space:nowrap}
+  .ch-ops-inner{display:inline-flex;align-items:center;justify-content:center;gap:10px}
+  .ch-ops .switch{transform:scale(.85);transform-origin:center}
+  .ch-del{border:0;background:none;color:var(--debt);font:inherit;font-size:12px;cursor:pointer;padding:4px 2px}
+  .ch-del:hover{text-decoration:underline}
+  .ch-empty{padding:16px 8px;text-align:center;color:var(--mut);font-size:12.5px}
   .kv{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 20px;font-size:13px;border-bottom:1px solid var(--line)}
   .kv:last-child{border-bottom:0}
   .kv .k{color:var(--mut);font-size:12.5px}
@@ -726,7 +751,7 @@
    数据（假数据，但全部由同一份账户数组推导，互相自洽）
    ========================================================= */
 /* 版本号唯一来源：与 package.json / fnos/manifest 保持一致，scripts/build-fpk.sh 会校验三处相等 */
-const APP_VERSION = '0.5.7';
+const APP_VERSION = '0.5.8';
 
 const SEED_ACCOUNTS = [
   { id:'a1',  name:'招行活期',        cat:'现金',   member:'我',   amount:93214,  prev:92000,  date:'2026-11-05', opened:'2019-03-11', due:'',          note:'日常开销', inNet:true, remind:true,  months:80 },
@@ -761,9 +786,10 @@ function todayStr(){
 const clone = o => JSON.parse(JSON.stringify(o));
 const DB_KEY = 'jiadi.data.v1';
 let storageRaw = null, lastGoodState = null, storageError = '';
-function dataState(){ return {v:1, accounts:ACCOUNTS, members:MEMBERS, archived:ARCHIVED, snapshots:getSnapshots()}; }
+function dataState(){ return {v:1, accounts:ACCOUNTS, members:MEMBERS, archived:ARCHIVED, snapshots:getSnapshots(), ...(GOAL ? {goal:GOAL} : {})}; }
 function restoreState(o){
   ACCOUNTS = clone(o.accounts); MEMBERS = clone(o.members); ARCHIVED = clone(o.archived); setSnapshots(clone(o.snapshots));
+  GOAL = o.goal ? clone(o.goal) : null;
 }
 function clearCheckin(){ S.checkin = {step:1, values:Object.create(null), jumpsOk:false, date:todayStr()}; }
 function resetTrendRange(){ S.trend.from=0; S.trend.to=Number.MAX_SAFE_INTEGER; }
@@ -809,9 +835,11 @@ let ACCOUNTS = _db ? _db.accounts : [];
 
 let MEMBERS  = _db ? _db.members : [];
 let ARCHIVED = _db ? _db.archived : [];
+let GOAL = _db && _db.goal ? _db.goal : null;   // 净值目标 {year, amount}，存进账本，跨设备共享
 async function resetDB(){
   ACCOUNTS = SEED_ACCOUNTS.map(a=>Object.assign({},a));
   _snapCache = seedSnapshots();
+  GOAL = null;                                   // 演示数据不带目标
   MEMBERS  = SEED_MEMBERS.map(m=>Object.assign({},m));
   ARCHIVED = SEED_ARCHIVED.map(a=>Object.assign({},a));
   if(!await saveDB({replaceUnreadable:true,reason:'replace'})) return false;
@@ -1038,7 +1066,7 @@ const S = {
   privacy:false,
   trend:{ mode:'net', grain:'month', from:0, to:Number.MAX_SAFE_INTEGER },
   people:{ sort:'amount', showArchived:false },
-  detail:{ member:'all', cat:'all', changed:false, stale:false, group:'cat', sort:'cat', showClosed:false },
+  detail:{ member:'all', cat:'all', changed:false, stale:false, group:'cat', sort:'cat', showClosed:false, q:'' },
   checkin:{ step:1, values:Object.create(null), jumpsOk:false, date:todayStr() },
   settings:{ '3':false }
 };
@@ -1105,6 +1133,17 @@ function getSnapshots(){
 }
 function setSnapshots(arr){ _snapCache = arr; }
 function categoryTotals(){ return Object.fromEntries(CATS.map(c=>[c, sumA(ACCOUNTS.filter(a=>a.cat===c && isAsset(a) && isCounted(a)))])); }
+/* 同比：周期末月 → 去年同月的代表点，缺任何一头就返回 null（不编数） */
+function yoyOf(endMonth){
+  if(!endMonth) return null;
+  const s = series(), map = new Map();
+  s.labels.forEach((lb,i)=>map.set(lb, s.N[i]));
+  const parts = String(endMonth).split('-');
+  if(parts.length !== 2) return null;
+  const cur = map.get(endMonth), prev = map.get(String(Number(parts[0])-1)+'-'+parts[1]);
+  if(cur === undefined || prev === undefined || !prev) return null;
+  return roundMoney((cur - prev) / Math.abs(prev) * 100);
+}
 const series = () => {
   const t = TOT(), cur = todayStr().slice(0,7);
   const snaps = getSnapshots().map((sn,i)=>({...sn, order:i})).sort((a,b)=>(a.date||a.month+'-01').localeCompare(b.date||b.month+'-01') || a.order-b.order);
@@ -1360,6 +1399,33 @@ function askPinNew(isChange,oldPassword){
     }
   });
 }
+/* 忘记密码：界面故意不提供一键清空（否则等于绕过密码）。只展示 NAS 上的离线恢复步骤。 */
+function showForgotPinHelp(){
+  openDrawer({
+    title:'忘记应用密码',
+    sub:'需 NAS 管理员在服务器上操作 · 账本数据不会丢',
+    body:`
+      <div class="hint" style="padding:8px 20px 0;line-height:1.55">应用密码只存校验值，没有「找回」。能清掉密码的人，本来就能碰到服务器上的账本文件，所以界面上不做自助重置。</div>
+      <div class="sec">操作步骤（飞牛 NAS）</div>
+      <div class="list" style="padding-top:0">
+        <div class="lrow" style="height:auto;align-items:flex-start;padding:10px 0"><span class="nm" style="white-space:normal;line-height:1.5"><b>1.</b> 在应用中心把「家底」停掉（或 <code>trim-cli app stop jiadi</code>）。</span></div>
+        <div class="lrow" style="height:auto;align-items:flex-start;padding:10px 0"><span class="nm" style="white-space:normal;line-height:1.5"><b>2.</b> SSH 登录 NAS，先干跑检查（不改文件）：</span></div>
+      </div>
+      <pre style="margin:0 20px;padding:12px 14px;border-radius:8px;background:var(--raised);border:1px solid var(--line);font:12px/1.5 var(--num);overflow:auto;white-space:pre-wrap">node /vol1/@appcenter/jiadi/reset-vault.mjs \\
+  --data-dir /vol1/@appdata/jiadi/data</pre>
+      <div class="list">
+        <div class="lrow" style="height:auto;align-items:flex-start;padding:10px 0"><span class="nm" style="white-space:normal;line-height:1.5"><b>3.</b> 确认无误后加上 <code>--yes</code> 真正清掉密码：</span></div>
+      </div>
+      <pre style="margin:0 20px;padding:12px 14px;border-radius:8px;background:var(--raised);border:1px solid var(--line);font:12px/1.5 var(--num);overflow:auto;white-space:pre-wrap">node /vol1/@appcenter/jiadi/reset-vault.mjs \\
+  --data-dir /vol1/@appdata/jiadi/data --yes</pre>
+      <div class="list">
+        <div class="lrow" style="height:auto;align-items:flex-start;padding:10px 0"><span class="nm" style="white-space:normal;line-height:1.5"><b>4.</b> 再启动「家底」。打开后会要求重新设置应用密码；账户、快照、成员都还在。</span></div>
+      </div>
+      <div class="hint" style="padding:8px 20px 0;line-height:1.55">脚本会先把当前 <code>ledger.json</code> 备份到数据目录的 <code>.jiadi-keep/</code>。若路径不同，用 <code>--data-dir</code> 指到实际账本目录。</div>`,
+    foot:'<button class="btn sm" id="forgotPinOk">知道了</button>'
+  });
+  $('#forgotPinOk').onclick = () => closeDrawer();
+}
 function togglePrivacy(){
   if(S.privacy) return askUnlock();
   openPrivacy();
@@ -1614,6 +1680,59 @@ function drawChart(svgId, mode, grain, tipId, shade){
 /* =========================================================
    P1 首页
    ========================================================= */
+/* 净值目标：目标值存进账本（goal:{year,amount}），这里只算完成度与节奏，不改任何账目 */
+function goalProgress(){
+  if(!GOAL || !GOAL.amount) return null;
+  const cur = TOT().N, target = GOAL.amount;
+  const s = series(), n = s.N.length, span = Math.max(0, Math.min(12, n-1));
+  const avg = span > 0 ? (s.N[n-1] - s.N[n-1-span]) / span : 0;
+  const need = roundMoney(target - cur);
+  return { target, cur, need, avg,
+    pct: target > 0 ? cur / target * 100 : 0,
+    months: (avg > 0 && need > 0) ? Math.ceil(need / avg) : null };
+}
+function goalBlock(){
+  const p = goalProgress();
+  const head = `<div class="card-h"><h2>净值目标${p ? ' · ' + GOAL.year : ''}</h2><span class="meta">${p ? '存进账本 · 电脑手机一致' : '还没有设定'}</span><button class="btn ghost sm" id="goalEdit" style="margin-left:auto">${p ? '编辑' : '设置目标'}</button></div>`;
+  if(!p) return `<section class="card" id="goalCard">${head}<div class="total-row"><span class="hint">设一个年度目标，首页显示完成度、差额和按当前节奏还要多久。</span></div></section>`;
+  const pct = Math.max(0, Math.min(100, p.pct));
+  const eta = p.need <= 0 ? '已达成目标' : (p.months === null ? '按最近节奏暂看不到达成' : '按最近 12 个月节奏约 ' + p.months + ' 个月后达成');
+  return `<section class="card" id="goalCard">${head}
+    <div style="padding:2px 20px 14px">
+      <div class="kv"><span class="k">目标</span><span class="v">¥${fmtY(p.target)}</span></div>
+      <div class="kv"><span class="k">当前净值</span><span class="v">¥${fmtY(p.cur)}</span></div>
+      <div class="kv"><span class="k">差额</span><span class="v" style="color:${p.need > 0 ? 'var(--debt)' : 'var(--up)'}">${p.need > 0 ? '还差 ¥' + fmtY(p.need) : '已超出 ¥' + fmtY(-p.need)}</span></div>
+      <div style="margin:12px 0 7px;height:6px;background:var(--raised);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:${pct.toFixed(1)}%;background:var(--asset)"></i></div>
+      <div class="hint">完成 ${p.pct.toFixed(1)}% · ${eta}</div>
+    </div></section>`;
+}
+function goalDrawer(){
+  if(S.privacy){ toast('遮挡中，请先输入应用密码解除'); return; }
+  const g = GOAL || { year:new Date().getFullYear(), amount:0 };
+  openDrawer({ title:'净值目标', sub:'写进账本 · 电脑和手机共用一份',
+    body:`<div style="padding:2px 20px 12px">
+      <label class="flabel" for="goalAmount" style="display:block;margin:10px 0 6px">目标净值（元）</label>
+      <input class="sel" id="goalAmount" inputmode="decimal" autocomplete="off" style="width:100%;height:34px" value="${g.amount ? String(g.amount) : ''}" placeholder="例如 2000000">
+      <label class="flabel" for="goalYear" style="display:block;margin:14px 0 6px">目标年份</label>
+      <input class="sel" id="goalYear" inputmode="numeric" autocomplete="off" style="width:100%;height:34px" value="${g.year || new Date().getFullYear()}">
+      <div class="hint" style="margin-top:10px">目标只用于显示完成度与节奏估算，不影响任何账户与快照。</div>
+    </div>`,
+    foot:`<button class="btn sm primary" id="goalSave">保存</button><button class="btn ghost sm" id="goalClear">清除目标</button>` });
+  $('#goalSave').onclick = async()=>{
+    const amount = parseAmount($('#goalAmount').value);
+    const year = Number(String($('#goalYear').value).trim());
+    if(amount === null || amount <= 0){ toast('目标金额要填一个大于 0 的数字'); return; }
+    if(!Number.isInteger(year) || year < 2000 || year > 2100){ toast('年份要在 2000–2100 之间'); return; }
+    GOAL = { year, amount };
+    if(!await saveDB()) return;
+    closeDrawer(); logIt('设置净值目标', year + ' 年 · ¥' + fmtY(amount)); renderCurrent(); toast('净值目标已保存');
+  };
+  $('#goalClear').onclick = async()=>{
+    GOAL = null;
+    if(!await saveDB()) return;
+    closeDrawer(); logIt('清除净值目标', ''); renderCurrent(); toast('已清除净值目标');
+  };
+}
 function eqBlock(){
   const t = TOT(), lr = t.A ? t.L/t.A*100 : 0, d = delta();
   const noDebt = t.L === 0;
@@ -1705,6 +1824,7 @@ function renderHome(){
 
     <div class="stack">
       ${eqBlock()}
+      ${goalBlock()}
 
       <section class="card">
         <div class="card-h">
@@ -1835,6 +1955,7 @@ function renderHome(){
 
   $('#goCheckin').onclick = () => show('checkin');
   $('#toTrend').onclick = () => show('trend');
+  const goalBtn = $('#goalEdit'); if(goalBtn) goalBtn.onclick = () => goalDrawer();
   const bkBtn = document.getElementById('backupBtn');
   if(bkBtn) bkBtn.onclick = () => exportJSON();
   $('#v-home').querySelectorAll('[data-drill]').forEach(el=>el.onclick = async()=>{
@@ -2004,16 +2125,19 @@ function renderTrend(){
               <span style="flex:1 1 0;text-align:right">负债</span>
               <span style="flex:1 1 0;text-align:right">净值</span>
               <span style="flex:1 1 0;text-align:right">较上次</span>
+              <span style="flex:0 0 72px;text-align:right">同比</span>
               <span style="flex:0 0 64px;text-align:right">负债率</span>
             </div>
             ${LBL.map((m,i)=>{
               const prev = i? nS.N[i-1] : null, c = prev===null?null:nS.N[i]-prev;
+              const yoy = yoyOf(nS.months[i]);
               return `<div class="lrow hoverable" data-month="${esc(nS.months[i])}" style="height:36px">
                 <span class="nm" style="flex:0 0 84px;font-family:var(--num);font-size:12.5px">${m}</span>
                 <span class="num" style="flex:1 1 0;text-align:right;font-size:12.5px">${fmtY(nS.A[i])}</span>
                 <span class="num" style="flex:1 1 0;text-align:right;font-size:12.5px;color:var(--debt)">${fmtY(nS.L[i])}</span>
                 <span class="num" style="flex:1 1 0;text-align:right;font-size:12.5px;font-weight:500">${fmtY(nS.N[i])}</span>
                 <span class="num" style="flex:1 1 0;text-align:right;font-size:12.5px;color:${c===null?'var(--mut)':(c>0?'var(--up)':'var(--down)')}">${c===null?'—':sign(c)+fmtY(Math.abs(c))}</span>
+                <span class="num" style="flex:0 0 72px;text-align:right;font-size:12.5px;color:${yoy===null?'var(--mut)':(yoy>0?'var(--up)':'var(--down)')}">${yoy===null?'—':sign(yoy)+yoy.toFixed(1)+'%'}</span>
                 <span class="num" style="flex:0 0 64px;text-align:right;font-size:12.5px;color:var(--ink-2)">${nS.A[i]?(nS.L[i]/nS.A[i]*100).toFixed(1)+'%':'—'}</span>
               </div>`;
             }).join('')}
@@ -2156,6 +2280,9 @@ function detailFilters(){
     if(f.cat==='assets' ? a.isDebt : (f.cat!=='all' && a.cat!==f.cat)) return false;
     if(f.changed && a.amount === a.prev) return false;
     if(f.stale && !isStale(a)) return false;
+    /* 搜索：账户名 / 备注 / 成员 / 类别，大小写与首尾空格都不敏感 */
+    const q = String(f.q || '').trim().toLowerCase();
+    if(q && !(a.name + ' ' + (a.note || '') + ' ' + (a.member || '') + ' ' + (a.cat || '')).toLowerCase().includes(q)) return false;
     return true;
   };
 }
@@ -2192,7 +2319,7 @@ function renderDetail(){
 
   $('#v-detail').innerHTML = `
     <div class="topbar">
-      <h1>明细</h1><span class="sub">按类别分组 · 负债置末</span>
+      <h1>明细</h1><span class="sub">按类别分组 · 负债置末${f.q ? ' · 命中 ' + rows.length + ' 个账户' : ''}</span>
     </div>
 
     <div class="stack">
@@ -2231,6 +2358,13 @@ function renderDetail(){
             <span class="flabel">状态</span>
             <button class="chip ${f.changed?'on':''}" data-f="changed">仅看有变化</button>
             <button class="chip ${f.stale?'on':''}" data-f="stale">仅看陈旧</button>
+          </div>
+          <div class="fgroup">
+            <span class="flabel">搜索</span>
+            <input class="sel" id="detailSearch" type="search" inputmode="search" autocomplete="off"
+                   placeholder="账户名 / 备注 / 成员" value="${esc(f.q||'')}" aria-label="搜索账户"
+                   style="height:28px;min-width:190px">
+            ${f.q ? '<button class="chip" id="clearSearch">清除搜索</button>' : ''}
           </div>
         </div>
 
@@ -2328,8 +2462,20 @@ function renderDetail(){
   $('#groupSel').onchange = e=>{ S.detail.group = e.target.value; rerender(); };
   $('#sortSel').onchange = e=>{ S.detail.sort = e.target.value; rerender(); };
   $('#newAcctBtn').onclick = ()=> accountFormDrawer(null);
+  const sq = $('#detailSearch');
+  if(sq){
+    sq.oninput = ()=>{
+      S.detail.q = sq.value;
+      const pos = sq.selectionStart;
+      rerender();
+      const next = $('#detailSearch');
+      if(next){ next.focus(); try{ if(pos!==null) next.setSelectionRange(pos,pos); }catch(e){} }
+    };
+    sq.onkeydown = e=>{ if(e.key === 'Escape'){ S.detail.q = ''; rerender(); } };
+  }
+  const cs = $('#clearSearch'); if(cs) cs.onclick = ()=>{ S.detail.q = ''; rerender(); };
   $('#resetFilters').onclick = async()=>{
-    S.detail = {...S.detail, member:'all', cat:'all', changed:false, stale:false};
+    S.detail = {...S.detail, member:'all', cat:'all', changed:false, stale:false, q:''};
     rerender(); toast('筛选已清除');
   };
   const ec = $('#emptyClear'); if(ec) ec.onclick = $('#resetFilters').onclick;
@@ -2536,7 +2682,8 @@ function renderCheckin(){
 const SETTINGS = [
   { g:'隐私与遮罩', meta:'锁定当前会话，隐藏全部金额', items:[
     { n:3, name:'隐私遮罩', key:'privacy', desc:'开启不需要密码；关闭需要输入密码。开启后页面锁定在首页', type:'switch' },
-    { n:'—', name:'应用密码', desc:'4–8 位字母+数字。自动上锁后解锁、换设备打开、加密导出都用它；只保存加密后的校验值，不存明文', type:'action', label:'修改密码', act:'pin' }
+    { n:'—', name:'应用密码', desc:'4–8 位字母+数字。自动上锁后解锁、换设备打开、加密导出都用它；只保存加密后的校验值，不存明文', type:'action', label:'修改密码', act:'pin' },
+    { n:'—', name:'忘记密码', desc:'界面不能自助清空密码（否则等于谁都能绕过）。需 NAS 管理员在服务器上操作，账本数据不会丢', type:'action', label:'查看步骤', act:'forgotPin' }
   ]},
   { g:'通用', meta:'影响所有页面', items:[
     { n:1, name:'时间范围', key:'range', desc:'曲线与区间的基准窗口', type:'select', opts:['近 12 月','近 6 月','近 3 年','全部'] },
@@ -2588,7 +2735,11 @@ const SETTINGS = [
   { g:'成员与账户', meta:'账户级属性在账户详情里改', items:[
     { n:'—', name:'成员管理', desc:'增删改归档；归档前须处理名下账户', type:'action', label:'打开抽屉', act:'members' },
     { n:'—', name:'类别字典', desc:'固定类别：现金 / 存款 / 投资 / 固定资产 / 负债', type:'readonly' },
-    { n:'—', name:'账户级属性', desc:'计入净值 / 参与提醒 / 是否负债 / 到期提醒 / 是否共同 —— 每账户独立，在账户抽屉里改', type:'readonly2', badge:'5 项' }
+    { n:'—', name:'账户级属性', desc:'计入净值 / 参与提醒 / 是否负债 / 到期提醒 / 是否共同 —— 每账户独立，在账户抽屉里改', type:'readonly2', badge:'5 项' },
+    { n:'—', name:'净值目标', desc:'年度目标写进账本，首页显示完成度、差额与达成节奏', type:'action', label:'设置', act:'goal' }
+  ]},
+  { g:'提醒推送', meta:'按 cron 定时推到手机/群 · 纯文本 · 配置存服务端', items:[
+    { n:'—', name:'推送设置', desc:'渠道（企业微信 / 钉钉 / 飞书 / Bark / 魔法推送 / SMTP / PushPlus / 企微应用 / Webhook / MeoW）、cron 计划与试发', type:'action', label:'打开', act:'notify' }
   ]},
   { g:'数据', meta:'服务端统一保存，电脑和手机共享', items:[
     { n:'—', name:'导出 JSON', desc:'验证应用密码后生成加密备份，导入时需导出密码', type:'action', label:'导出', act:'exportJson' },
@@ -2663,6 +2814,8 @@ function renderSettings(){
   $$('#v-settings [data-act]').forEach(b=>b.onclick = async()=>{
     const a = b.dataset.act;
     if(a === 'members') membersDrawer();
+    else if(a === 'goal') goalDrawer();
+    else if(a === 'notify') notifyDrawer();
     else if(a === 'exportJson') exportJSON();
     else if(a === 'exportCsv') exportCSV();
     else if(a === 'importLedger') importLedger();
@@ -2676,9 +2829,10 @@ function renderSettings(){
       onOk: async()=>{ if(!await resetDB()) return; logIt('恢复演示数据', '本地库已重置'); renderCurrent(); toast('已恢复初始数据'); }
     });
     else if(a === 'pin') askPinChange();
+    else if(a === 'forgotPin') showForgotPinHelp();
     else if(a === 'wipe') modal({
       title:'清空全部数据', desc:'账户、成员、快照和操作日志全部清空，不可撤销。显示偏好及应用密码保留。请输入 <b>家底</b> 确认。', input:'家底', expect:'家底', placeholder:'家底', okText:'清空', danger:true,
-      onOk: async()=>{ ACCOUNTS = []; MEMBERS = []; ARCHIVED = []; setSnapshots([]); if(!await saveDB({replaceUnreadable:true,clearLogs:true,reason:'clear'})) return; clearCheckin(); try{await window.jiadiClearDraft?.();}catch{}
+      onOk: async()=>{ ACCOUNTS = []; MEMBERS = []; ARCHIVED = []; setSnapshots([]); GOAL = null; if(!await saveDB({replaceUnreadable:true,clearLogs:true,reason:'clear'})) return; clearCheckin(); try{await window.jiadiClearDraft?.();}catch{}
         try{if(!SHARED)localStorage.removeItem(LOG_KEY);}catch(e){renderCurrent();toast('账本已清空，但操作日志清理失败：'+e.message);return;}
         PREF.lastExport=''; savePrefs(); renderCurrent(); toast('账本与操作日志已清空'); }
     });
@@ -3141,13 +3295,237 @@ function backupDrawer(){
     foot:'<button class="btn sm" id="backupExport">导出 JSON</button><button class="btn sm" id="backupImport">导入 JSON</button>'});
   $('#backupExport').onclick=exportJSON; $('#backupImport').onclick=importJSON;
 }
+/* 提醒推送：配置存在服务端 notify.json（不进账本），界面只回显掩码。
+   渠道区对齐「日志推送 / FnMessageBot」：表格 +「添加渠道」，不一次列全渠道。 */
+async function notifyDrawer(){
+  if(S.privacy){ toast('遮挡中，请先输入应用密码解除'); return; }
+  if(!SHARED){ toast('提醒推送需要共享账本服务（在飞牛应用里打开）'); return; }
+  let data;
+  try{ data = await SHARED.request('/api/notify'); }
+  catch(e){ toast('读取推送设置失败：' + e.message); return; }
+  const channels = data.channels || {}, metas = data.channelsMeta || [];
+  const byKey = Object.fromEntries(metas.map(m => [m.key, m]));
+  const hintOf = meta => {
+    if(!meta) return '';
+    if(meta.kind === 'url') return meta.key === 'bark' ? 'https://api.day.app/你的设备key' : '机器人 Webhook 地址';
+    return 'JSON，需含 ' + (meta.need || []).join(' / ');
+  };
+  /* 优先用行式 items（可关开关仍保留）；否则从 channels 展开 */
+  const initialRows = [];
+  if(Array.isArray(data.items) && data.items.length){
+    data.items.forEach(it => {
+      if(!it || !it.key || it.value == null || String(it.value).trim() === '') return;
+      initialRows.push({ key: it.key, value: String(it.value), enabled: it.enabled !== false });
+    });
+  }else{
+    metas.forEach(meta => {
+      const raw = channels[meta.key];
+      if(raw == null || String(raw).trim() === '') return;
+      const text = String(raw);
+      if(text.includes('…')){ initialRows.push({ key: meta.key, value: text, enabled: true }); return; }
+      text.split('|').map(s => s.trim()).filter(Boolean).forEach(v => initialRows.push({ key: meta.key, value: v, enabled: true }));
+    });
+  }
+  const last = data.lastRun
+    ? '上次触发：' + esc(fmtLogTime(data.lastRun.at) || data.lastRun.at) + (data.lastRun.skipped ? '（没有异常，未发送）' : (data.lastRun.ok ? '（发送成功）' : '（发送失败）'))
+    : '还没有触发过';
+  openDrawer({ title:'提醒推送', sub:'纯文本 · 本月未盘点 / 超过天数没更新 / 即将到期',
+    body:`<div style="padding:4px 0 12px">
+      <div style="padding:0 20px">
+        <div class="kv"><span class="k">启用定时推送</span><span class="v"><button class="switch ${data.enabled ? 'on' : ''}" id="notifyEnabled" aria-pressed="${!!data.enabled}" aria-label="启用定时推送"></button></span></div>
+        <label class="flabel" style="display:block;margin:14px 0 6px" for="notifyCron">cron 计划（分 时 日 月 周）</label>
+        <input class="sel" id="notifyCron" style="width:100%;height:32px;font-family:var(--num)" value="${esc(data.cron || '0 9 * * *')}" autocomplete="off" spellcheck="false">
+        <div class="hint" style="margin-top:6px">${esc(data.cronDescription || '')}${(data.next && data.next.length) ? ' · 下次 ' + esc(fmtLogTime(data.next[0]) || data.next[0]) : ''}</div>
+        <div class="hint">例：<code>0 9 * * *</code> 每天 9:00 · <code>30 8 * * 1</code> 每周一 8:30 · <code>0 10 1 * *</code> 每月 1 日 10:00</div>
+        <div class="kv" style="margin-top:12px"><span class="k">没有异常也发一条</span><span class="v"><button class="switch ${data.sendWhenNothing ? 'on' : ''}" id="notifyAlways" aria-pressed="${!!data.sendWhenNothing}" aria-label="没有异常也发一条"></button></span></div>
+        <div class="hint" style="margin-top:10px">${last}</div>
+      </div>
+      <div class="ch-head">
+        <div class="sec">推送渠道 <span style="font-weight:400">同一渠道可加多行；关开关保留配置但不推送</span></div>
+        <button type="button" class="ch-add" id="notifyAddCh"><span>＋</span> 添加渠道</button>
+      </div>
+      <div class="ch-wrap">
+        <table class="ch-table">
+          <thead><tr><th style="width:108px">渠道类型</th><th>推送地址</th><th class="ch-ops" style="width:96px">操作</th></tr></thead>
+          <tbody id="notifyChBody"></tbody>
+        </table>
+        <div class="ch-empty" id="notifyChEmpty" hidden>还没有渠道，点右上角「添加渠道」</div>
+      </div>
+      <div class="hint" style="padding:8px 20px 0">密钥只存在服务端 notify.json（0600），不进账本；回显为掩码时不动它保存即保持原值。教程见
+        <a href="https://www.lndo.top/blog/fn-message-bots-channels" target="_blank" rel="noopener noreferrer">日志推送 · 渠道配置</a>。
+      </div>
+    </div>`,
+    foot:`<button class="btn sm primary" id="notifySave">保存</button><button class="btn sm" id="notifyTest">试发</button>` });
+
+  const swEnable = $('#notifyEnabled'), swAlways = $('#notifyAlways');
+  swEnable.onclick = () => { const on = swEnable.classList.toggle('on'); swEnable.setAttribute('aria-pressed', on); };
+  swAlways.onclick = () => { const on = swAlways.classList.toggle('on'); swAlways.setAttribute('aria-pressed', on); };
+  const bodyEl = $('#notifyChBody'), emptyEl = $('#notifyChEmpty');
+  const syncEmpty = () => { emptyEl.hidden = bodyEl.children.length > 0; };
+
+  const paintValueCell = (td, key, value) => {
+    const meta = byKey[key];
+    td.innerHTML = '';
+    if(meta && meta.kind === 'json'){
+      const ta = document.createElement('textarea');
+      ta.className = 'sel'; ta.rows = 3; ta.spellcheck = false; ta.autocomplete = 'off';
+      ta.placeholder = hintOf(meta); ta.value = value || '';
+      td.appendChild(ta);
+    }else{
+      const inp = document.createElement('input');
+      inp.className = 'sel'; inp.type = 'text'; inp.spellcheck = false; inp.autocomplete = 'off';
+      inp.placeholder = hintOf(meta); inp.value = value || '';
+      td.appendChild(inp);
+    }
+  };
+  const readRowValue = tr => {
+    const ta = tr.querySelector('textarea.sel');
+    if(ta) return ta.value.trim();
+    const inp = tr.querySelector('input.sel');
+    return inp ? inp.value.trim() : '';
+  };
+  const addRow = (key, value, enabled) => {
+    const meta0 = byKey[key] || metas[0];
+    if(!meta0){ toast('没有可用渠道类型'); return; }
+    const useKey = byKey[key] ? key : meta0.key;
+    const tr = document.createElement('tr');
+    if(!enabled) tr.classList.add('is-off');
+    const tdType = document.createElement('td');
+    const sel = document.createElement('select');
+    sel.className = 'sel';
+    metas.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m.key; o.textContent = m.name;
+      if(m.key === useKey) o.selected = true;
+      sel.appendChild(o);
+    });
+    tdType.appendChild(sel);
+    const tdVal = document.createElement('td');
+    paintValueCell(tdVal, useKey, value || '');
+    sel.onchange = () => {
+      const prev = readRowValue(tr);
+      paintValueCell(tdVal, sel.value, prev);
+    };
+    const tdOps = document.createElement('td');
+    tdOps.className = 'ch-ops';
+    const inner = document.createElement('div');
+    inner.className = 'ch-ops-inner';
+    const sw = document.createElement('button');
+    sw.type = 'button'; sw.className = 'switch' + (enabled ? ' on' : '');
+    sw.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    sw.setAttribute('aria-label', '启用该渠道');
+    sw.title = '关闭后保留本行配置，但不参与推送';
+    sw.onclick = () => {
+      const on = sw.classList.toggle('on');
+      sw.setAttribute('aria-pressed', on ? 'true' : 'false');
+      tr.classList.toggle('is-off', !on);
+    };
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'ch-del'; del.textContent = '删除';
+    del.onclick = () => { tr.remove(); syncEmpty(); };
+    inner.appendChild(sw); inner.appendChild(del);
+    tdOps.appendChild(inner);
+    tr.appendChild(tdType); tr.appendChild(tdVal); tr.appendChild(tdOps);
+    bodyEl.appendChild(tr);
+    syncEmpty();
+  };
+
+  initialRows.forEach(r => addRow(r.key, r.value, r.enabled !== false));
+  syncEmpty();
+  $('#notifyAddCh').onclick = () => addRow((metas[0] && metas[0].key) || 'wechat', '', true);
+
+  const collect = () => {
+    const items = [];
+    Array.from(bodyEl.children).forEach(tr => {
+      const key = tr.querySelector('select') && tr.querySelector('select').value;
+      const val = readRowValue(tr);
+      if(!key || !val) return;
+      const sw = tr.querySelector('.switch');
+      items.push({ key, value: val, enabled: !(sw && !sw.classList.contains('on')) });
+    });
+    return { enabled: swEnable.classList.contains('on'), sendWhenNothing: swAlways.classList.contains('on'),
+      cron: $('#notifyCron').value.trim(), items };
+  };
+  $('#notifySave').onclick = async() => {
+    const payload = collect();
+    try{
+      const saved = await SHARED.request('/api/notify', { method:'PUT', body: payload });
+      closeDrawer(); logIt('保存推送设置', (saved.enabled ? '已启用 · ' : '未启用 · ') + saved.cron);
+      renderCurrent(); toast('推送设置已保存');
+    }catch(e){ toast('保存失败：' + e.message); }
+  };
+  $('#notifyTest').onclick = async() => {
+    toast('正在试发…');
+    try{
+      const result = await SHARED.request('/api/notify/test', { method:'POST', body: collect() });
+      const bad = (result.results || []).filter(r => !r.ok);
+      logIt('试发推送', result.ok ? '成功' : ('失败：' + bad.map(r => r.channel + ' ' + r.detail).join('；')));
+      if(result.ok) toast('试发成功：' + (result.results || []).filter(r => r.ok).map(r => r.channel).join('、'));
+      else toast('试发失败：' + (bad.map(r => r.channel + ' ' + (r.detail || '')).join('；') || '没有可用渠道'));
+    }catch(e){ toast('试发失败：' + e.message); }
+  };
+}
+
 function snapshotDrawer(idx){
   if(S.privacy) return;
   const s=series(), month=s.labels[idx];
   if(!month) return;
   const records=getSnapshots().filter(sn=>sn.month===month);
   openDrawer({title:month+' 快照',sub:records.length?`${records.length} 条已保存记录 · 当前代表点：${esc(PREF.multiPoint)}`:'当前余额汇总 · 尚未保存月度快照',
-    body:`<div class="kv"><span class="k">总资产</span><span class="v">¥${fmtY(s.A[idx])}</span></div><div class="kv"><span class="k">总负债</span><span class="v">¥${fmtY(s.L[idx])}</span></div><div class="kv"><span class="k">净资产</span><span class="v">¥${fmtY(s.N[idx])}</span></div><div class="kv"><span class="k">负债率</span><span class="v">${s.A[idx]? (s.L[idx]/s.A[idx]*100).toFixed(1)+'%':'—'}</span></div><div class="sec">已保存记录</div><div class="list">${records.map(sn=>`<div class="lrow"><span class="nm">${esc(sn.date||sn.month+'（未记录具体日期）')}</span><span class="amt">净值 ${fmtY(sn.A-sn.L)}</span></div>`).join('')||'<div class="hint" style="padding:16px">盘点提交后才有记录。</div>'}</div>`,foot:''});
+    body:`<div class="kv"><span class="k">总资产</span><span class="v">¥${fmtY(s.A[idx])}</span></div><div class="kv"><span class="k">总负债</span><span class="v">¥${fmtY(s.L[idx])}</span></div><div class="kv"><span class="k">净资产</span><span class="v">¥${fmtY(s.N[idx])}</span></div><div class="kv"><span class="k">负债率</span><span class="v">${s.A[idx]? (s.L[idx]/s.A[idx]*100).toFixed(1)+'%':'—'}</span></div><div class="sec">已保存记录</div><div class="list">${records.map(sn=>`<div class="lrow"><span class="nm">${esc(sn.date||sn.month+'（未记录具体日期）')}</span><span class="amt">净值 ${fmtY(sn.A-sn.L)}</span></div>`).join('')||'<div class="hint" style="padding:16px">盘点提交后才有记录。</div>'}</div>`,
+    foot: records.length ? `<button class="btn sm danger" id="delPeriod">删除这一期</button>` : ''});
+  const dp=$('#delPeriod'); if(dp) dp.onclick = ()=> deletePeriod(month);
+}
+/* 删除某一期盘点：撤掉本期快照，并把本期写入的账户历史回滚到上一期。
+   历史只剩本期一条的账户无法安全回滚——禁止删除，避免快照没了、余额仍是本期。
+   有快照但无账户历史（如只导入了快照）时，只删快照并明确提示余额不会回滚。 */
+function deletePeriod(month){
+  if(S.privacy){ toast('遮挡中，请先输入应用密码解除'); return; }
+  const snaps = getSnapshots().filter(sn=>sn.month===month);
+  if(!snaps.length){ toast('这一期没有可删除的盘点记录'); return; }
+  const hitOf = a => (Array.isArray(a.history) ? a.history.filter(h=>String(h.date||'').slice(0,7)===month).length : 0);
+  const hit = ACCOUNTS.reduce((n,a)=>n+hitOf(a),0);
+  const stuck = ACCOUNTS.filter(a=>hitOf(a) && hitOf(a) === (a.history||[]).length).length;
+  if(stuck){
+    modal({
+      title:'无法删除 ' + month,
+      desc:'有 <b>' + stuck + '</b> 个账户的历史只有这一期，删除后无法回滚余额，账本会与趋势不一致。请先处理这些账户（删除账户或补记更早历史），再删这一期。',
+      okText:'知道了'
+    });
+    return;
+  }
+  const snapsOnly = hit === 0;
+  modal({
+    title: snapsOnly ? ('删除 ' + month + ' 的快照？') : ('删除 ' + month + ' 这一期？'),
+    desc: snapsOnly
+      ? ('本期没有可回滚的账户历史（例如快照是导入的）。将删除 <b>' + snaps.length + '</b> 条快照，账户余额保持不变，趋势与账户现状可能不一致。'
+          + '<br><br>原始记录不可撤销。请输入 <b>删除</b> 确认。')
+      : ('将删除本期 <b>' + snaps.length + '</b> 条快照，并回滚本期写入的 <b>' + hit + '</b> 条账户历史，账户余额回到上一期。'
+          + '<br><br>原始记录不可撤销。请输入 <b>删除</b> 确认。'),
+    input:'删除', expect:'删除', placeholder:'删除', okText:'删除', danger:true,
+    onOk: async()=>{
+      setSnapshots(getSnapshots().filter(sn=>sn.month!==month));
+      let rolled = 0;
+      if(!snapsOnly){
+        ACCOUNTS.forEach(a=>{
+          const n = hitOf(a);
+          if(!n) return;
+          const next = a.history.filter(h=>String(h.date||'').slice(0,7)!==month);
+          if(!next.length) return;                        // 防御：无更早历史则不动（前面已拦截 stuck）
+          const last = next[next.length-1], prev = next.length>1 ? next[next.length-2] : last;
+          a.history = next;
+          a.amount = last.amount; a.date = last.date; a.prev = prev.amount;
+          a.months = new Set(next.map(h=>String(h.date).slice(0,7))).size;
+          rolled++;
+        });
+      }
+      if(!await saveDB()) return;
+      closeDrawer();
+      logIt('删除盘点期', month + ' · ' + snaps.length + ' 条快照 · 回滚 ' + rolled + ' 个账户');
+      renderCurrent();
+      toast(snapsOnly ? ('已删除 ' + month + ' 的快照（未改账户）') : ('已删除 ' + month + ' 这一期'));
+    }
+  });
 }
 
 function membersDrawer(){
@@ -3387,7 +3765,8 @@ $('#sideFoot').onclick = async()=>{
       <div class="kv"><span class="k">账户 / 快照</span><span class="v">${ACCOUNTS.length} / ${getSnapshots().length}</span></div>
       <div class="kv"><span class="k">项目主页</span><span class="v text" style="font-size:12px"><a href="https://github.com/Sunanang/jiadi" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;text-underline-offset:2px">github.com/Sunanang/jiadi</a></span></div>
       <div class="kv"><span class="k">许可</span><span class="v text">MIT 开源</span></div>
-      <div class="kv"><span class="k">额度</span><span class="v text">无账号 · 无云同步 · 无遥测</span></div>`,
+      <div class="kv"><span class="k">额度</span><span class="v text">无账号 · 无云同步 · 无遥测</span></div>
+      <div class="hint" style="padding:14px 20px 0;line-height:1.5">忘记应用密码：设置 → 隐私与遮罩 →「忘记密码」查看 NAS 上的恢复步骤（清密码、不动账本）。</div>`,
     foot:''
   });
 };
@@ -3486,7 +3865,7 @@ function onbSteps(){
     pw:true,
     h:'先设一个应用密码',
     p:'已用飞牛 NAS 账号登录。再设一个<span class="em">应用密码</span>，它就是家底的最后一道门：连续 15 分钟没有操作会自动上锁，换浏览器或换设备打开时也要输入它才能看到账本。',
-    list:['4–8 位，且同时包含字母和数字','忘记后可以在应用里重设，账本数据不受影响','这一步不能跳过，否则账本等于没有锁']
+    list:['4–8 位，且同时包含字母和数字','忘了只能由 NAS 管理员在服务器上跑 scripts/reset-vault.mjs 清掉密码（账本数据不动），界面上不提供自助重置','这一步不能跳过，否则账本等于没有锁']
   });
   return steps.concat(ONB);
 }

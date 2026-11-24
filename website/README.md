@@ -70,5 +70,6 @@ Safari 的原生片段跳转（点 `#id` 链接）**不认 `scroll-margin-top`**
 ## 内容维护
 
 - 版本号出现在首屏徽章与页脚，发版时与 `package.json` 一起改。
-- 下载按钮指向 `https://github.com/Sunanang/jiadi/releases/latest`，不需要每次发版改地址。
+- 下载按钮指向本站 `downloads/jiadi-<版本>-fnos-all.fpk`（安装包随仓库入库，国内节点直连），页面加载时用 `downloads/version.json` 覆盖成最新版本。
+- 发版时 `scripts/sync-website-downloads.sh` 会同时更新 `downloads/` 与 `index.html` 里的静态兜底值（版本徽章、两个下载 href、文件名、sha256），因此不要再手改；`.github/workflows/release.yml` 会把这两处一起提交。
 - 文案口径与 README 保持一致：不承诺自动备份、不承诺公网安全、不承诺通知必达。
