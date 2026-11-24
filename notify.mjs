@@ -69,9 +69,8 @@ export function validCron(expr) {
   try { parseCron(expr); return true; } catch { return false; }
 }
 
-/** 分钟级匹配；日与周同时受限时按 cron 惯例取「或」 */
-export function cronMatches(expr, date) {
-  const c = parseCron(expr);
+/** 分钟级匹配（已解析版本）；日与周同时受限时按 cron 惯例取「或」 */
+export function cronMatchesParsed(c, date) {
   const minute = date.getMinutes(), hour = date.getHours();
   const dom = date.getDate(), month = date.getMonth() + 1, dow = date.getDay();
   if (!c.minute.has(minute) || !c.hour.has(hour) || !c.month.has(month)) return false;
@@ -83,13 +82,32 @@ export function cronMatches(expr, date) {
   return domOk || dowOk;
 }
 
+/** 分钟级匹配；日与周同时受限时按 cron 惯例取「或」 */
+export function cronMatches(expr, date) {
+  return cronMatchesParsed(parseCron(expr), date);
+}
+
+/** 今天（本地日历日）最近一次已经到点的计划时间；没有则 null。用于应用/NAS 重启后的补发 */
+export function lastScheduledToday(expr, now = new Date()) {
+  const c = parseCron(expr);
+  const cursor = new Date(now.getTime());
+  cursor.setSeconds(0, 0);
+  for (let i = 0; i <= 24 * 60; i++) {
+    if (cronMatchesParsed(c, cursor)) return new Date(cursor.getTime());
+    if (cursor.getDate() !== now.getDate()) return null;
+    cursor.setMinutes(cursor.getMinutes() - 1);
+  }
+  return null;
+}
+
 export function nextRuns(expr, from = new Date(), count = 3, limitMinutes = 60 * 24 * 366) {
+  const c = parseCron(expr);          // 只解析一次：原来每分钟都 parseCron，年/月级计划会卡几秒
   const out = [];
   const cursor = new Date(from.getTime());
   cursor.setSeconds(0, 0);
   cursor.setMinutes(cursor.getMinutes() + 1);
   for (let i = 0; i < limitMinutes && out.length < count; i++) {
-    if (cronMatches(expr, cursor)) out.push(new Date(cursor.getTime()));
+    if (cronMatchesParsed(c, cursor)) out.push(new Date(cursor.getTime()));
     cursor.setMinutes(cursor.getMinutes() + 1);
   }
   return out;
@@ -153,11 +171,25 @@ export function isMasked(value) {
   return typeof value === 'string' && value.includes('…');
 }
 
+/** 挡掉不该被推送去访问的目标：链路本地（含云元数据 169.254.169.254）与 0.0.0.0。
+    内网 192.168/10/172.16 是魔法推送的正常用法，必须放行。 */
+export function blockedTarget(rawUrl) {
+  let u;
+  try { u = new URL(rawUrl); } catch { return '地址不合法'; }
+  const host = u.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (host === '0.0.0.0' || host === '::' || host === '') return '地址为空';
+  if (/^169\.254\./.test(host)) return '不允许推送到链路本地地址（含云元数据接口）';
+  if (host === 'metadata.google.internal' || host === 'metadata') return '不允许推送到云元数据地址';
+  return null;
+}
+
 function validateChannelPiece(meta, piece) {
   if (meta.kind === 'url') {
     let u;
     try { u = new URL(piece); } catch { throw new Error(meta.name + ' 的地址不是合法 URL'); }
     if (!/^https?:$/.test(u.protocol)) throw new Error(meta.name + ' 只支持 http/https 地址');
+    const blocked = blockedTarget(piece);
+    if (blocked) throw new Error(meta.name + ' ' + blocked);
     return;
   }
   let obj;
@@ -165,6 +197,13 @@ function validateChannelPiece(meta, piece) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error(meta.name + ' 的参数必须是 JSON 对象');
   for (const need of meta.need || []) {
     if (!obj[need]) throw new Error(meta.name + ' 缺少 ' + need);
+  }
+  /* JSON 渠道里的地址同样要挡 */
+  for (const field of ['url', 'base_url', 'api_base']) {
+    if (typeof obj[field] === 'string') {
+      const blocked = blockedTarget(obj[field]);
+      if (blocked) throw new Error(meta.name + ' 的 ' + field + ' ' + blocked);
+    }
   }
 }
 
@@ -346,6 +385,13 @@ export async function sendToChannel(key, value, message, { fetchImpl = globalThi
       try { params = JSON.parse(piece); } catch { results.push({ channel: meta.name, ok: false, detail: '参数不是合法 JSON' }); continue; }
     }
     try {
+      /* 配置可能被手改过 notify.json：发送前再拦一次链路本地/元数据地址 */
+      const probe = typeof params === 'string' ? params : (params.url || params.base_url || params.api_base || '');
+      const blocked = probe ? blockedTarget(probe) : null;
+      if (blocked) {
+        results.push({ channel: meta.name, ok: false, detail: blocked });
+        continue;
+      }
       if (key === 'wecomapp') {
         const r = await sendWecomApp(fetchImpl, params, message);
         results.push({ channel: meta.name, ok: !!r.ok, detail: r.detail || '', response: r.response });
@@ -367,13 +413,16 @@ export async function sendToChannel(key, value, message, { fetchImpl = globalThi
   return results;
 }
 
+/** 只发 failedKeys（重试场景）：避免把已经送达的渠道再发一遍 */
 export async function sendAll(channels, message, opts = {}) {
+  const only = Array.isArray(opts.only) && opts.only.length ? new Set(opts.only) : null;
   const results = [];
   for (const [key, value] of Object.entries(channels || {})) {
     if (!value) continue;
-    results.push(...await sendToChannel(key, value, message, opts));
+    if (only && !only.has(key)) continue;
+    for (const r of await sendToChannel(key, value, message, opts)) results.push({ key, ...r });
   }
-  return { ok: results.some(r => r.ok), results };
+  return { ok: results.length > 0 && results.every(r => r.ok), results };
 }
 
 /* ---------------- 最小 SMTP（无依赖） ---------------- */
@@ -456,23 +505,29 @@ async function sendMail(params, message) {
 
 /* ---------------- 摘要内容（纯文本，不带具体金额） ---------------- */
 
+/** 本地日历日（yyyy-mm-dd）。注意不能用 toISOString：那是 UTC，东八区 00:00–08:00 会差一天。 */
+const localYmd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
 export function buildDigest(ledger, now = new Date(), opts = {}) {
   const accounts = Array.isArray(ledger && ledger.accounts) ? ledger.accounts : [];
   const snapshots = Array.isArray(ledger && ledger.snapshots) ? ledger.snapshots : [];
-  const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const ym = localYmd(now).slice(0, 7);
+  const today = localYmd(now);
   const checkinMissing = !snapshots.some(s => s.month === ym);
   const staleDays = Number(opts.staleDays || 45);
+  /* 与首页提醒口径一致：关户 / 不参与提醒 / 不计入净值的账户都不提醒 */
+  const remindable = a => !a.closed && a.remind !== false && a.inNet !== false;
   const stale = accounts.filter(a => {
-    if (a.closed || a.remind === false) return false;
+    if (!remindable(a)) return false;
     const t = Date.parse(String(a.date || '') + 'T00:00:00');
     return Number.isFinite(t) && (now.getTime() - t) / 86400000 > staleDays;
   }).length;
   const lead = Number(opts.dueLeadDays || 30);
   const dueSoon = accounts.filter(a => {
-    if (!a.due) return false;
+    if (!a.due || !remindable(a)) return false;
     const d = Date.parse(a.due + 'T00:00:00');
     if (!Number.isFinite(d)) return false;
-    const days = (d - Date.parse(now.toISOString().slice(0, 10) + 'T00:00:00')) / 86400000;
+    const days = (d - Date.parse(today + 'T00:00:00')) / 86400000;
     return days >= 0 && days <= lead;
   }).length;
   const counted = accounts.filter(a => !a.closed && a.inNet !== false);

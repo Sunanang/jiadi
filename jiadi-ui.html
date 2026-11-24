@@ -3335,10 +3335,11 @@ async function notifyDrawer(){
         <div class="kv"><span class="k">启用定时推送</span><span class="v"><button class="switch ${data.enabled ? 'on' : ''}" id="notifyEnabled" aria-pressed="${!!data.enabled}" aria-label="启用定时推送"></button></span></div>
         <label class="flabel" style="display:block;margin:14px 0 6px" for="notifyCron">cron 计划（分 时 日 月 周）</label>
         <input class="sel" id="notifyCron" style="width:100%;height:32px;font-family:var(--num)" value="${esc(data.cron || '0 9 * * *')}" autocomplete="off" spellcheck="false">
-        <div class="hint" style="margin-top:6px">${esc(data.cronDescription || '')}${(data.next && data.next.length) ? ' · 下次 ' + esc(fmtLogTime(data.next[0]) || data.next[0]) : ''}</div>
+        <div class="hint" style="margin-top:6px">${esc(data.cronDescription || '')}${(data.next && data.next.length) ? ' · 下次 ' + esc(fmtLogTime(data.next[0]) || data.next[0]) : ''} · 按 NAS 本地时间</div>
+        ${(data.enabled && !(data.activeChannels > 0)) ? '<div class="warn-box" style="margin-top:8px">已开启定时推送，但没有启用中的渠道 —— 到点不会发出去。把下面某一行打开开关再保存。</div>' : ''}
         <div class="hint">例：<code>0 9 * * *</code> 每天 9:00 · <code>30 8 * * 1</code> 每周一 8:30 · <code>0 10 1 * *</code> 每月 1 日 10:00</div>
         <div class="kv" style="margin-top:12px"><span class="k">没有异常也发一条</span><span class="v"><button class="switch ${data.sendWhenNothing ? 'on' : ''}" id="notifyAlways" aria-pressed="${!!data.sendWhenNothing}" aria-label="没有异常也发一条"></button></span></div>
-        <div class="hint" style="margin-top:10px">${last}</div>
+        <div class="hint" style="margin-top:10px">${last}${(data.lastRun && data.lastRun.ok === false && Array.isArray(data.lastRun.results) && data.lastRun.results.some(r => !r.ok)) ? '<br>失败原因：' + esc(data.lastRun.results.filter(r => !r.ok).map(r => r.channel + ' ' + (r.detail || '')).join('；')) : ''}</div>
       </div>
       <div class="ch-head">
         <div class="sec">推送渠道 <span style="font-weight:400">同一渠道可加多行；关开关保留配置但不推送</span></div>

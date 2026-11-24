@@ -18,7 +18,7 @@
  *   2) 跑本脚本 --yes
  *   3) 再启动应用；打开后会重新走「先设一个应用密码」，账本数据原样还在
  */
-import {readFile, writeFile, rename, mkdir, stat, open} from 'node:fs/promises';
+import {readFile, writeFile, rename, mkdir, stat, open, chmod, chown} from 'node:fs/promises';
 import {join, resolve, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -76,6 +76,9 @@ if(dryRun){
   process.exit(0);
 }
 
+/* 先记下原文件的属主与权限：脚本常以 root 跑，若写完把属主变成 root，
+   应用（非 root 用户）就再也读不到账本 —— 这是最容易踩的坑。 */
+const before = await stat(ledgerPath);
 const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
 await mkdir(keepDir, {recursive: true});
 const backupPath = join(keepDir, 'ledger-before-vault-reset-' + stamp + '.json');
@@ -84,12 +87,18 @@ console.log('已备份原文件：' + backupPath);
 
 const next = {...disk, vault: null};
 const tmpPath = ledgerPath + '.tmp-' + process.pid;
-const handle = await open(tmpPath, 'w', 0o600);
+const handle = await open(tmpPath, 'w', before.mode & 0o777);
 try{
   await handle.writeFile(JSON.stringify(next), 'utf8');
   await handle.sync();
 }finally{ await handle.close(); }
 await rename(tmpPath, ledgerPath);
+/* 以 root 运行时把属主/权限恢复成原样；非 root 动不了属主，至少保证权限一致 */
+try{
+  if(process.getuid && process.getuid() === 0) await chown(ledgerPath, before.uid, before.gid);
+  else if(typeof process.getuid === 'function' && process.getuid() !== before.uid) console.warn('⚠ 当前用户不是文件属主，账本属主仍是原用户，请确认应用能读到。');
+  await chmod(ledgerPath, before.mode & 0o777);
+}catch(e){ console.warn('⚠ 恢复属主/权限失败（' + ((e && e.message) || e) + '），请手动确认应用可读：' + ledgerPath); }
 
 const check = JSON.parse(await readFile(ledgerPath, 'utf8'));
 if(check.vault !== null) die('写入后校验失败（vault 仍然是设置状态），请用备份文件恢复：' + backupPath);

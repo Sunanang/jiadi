@@ -15,7 +15,7 @@ const log=text=>{const row=document.createElement('div');row.textContent=text;ou
 const equal=(a,b)=>{if(JSON.stringify(a)!==JSON.stringify(b))throw new Error(JSON.stringify(a)+' != '+JSON.stringify(b));};
 const check=(value,message)=>{if(!value)throw new Error(message);};
 const clone=o=>JSON.parse(JSON.stringify(o));
-let ledger={v:1,accounts:[{id:'cash',name:'共享现金',cat:'现金',member:'我',amount:100,prev:100,date:'2026-11-06'}],members:[{name:'我'}],archived:[],snapshots:[]},revision=0,logs=[],password='abc1',uncertain=false,denySave=false,exportCalls=0,expired=false;
+let ledger={v:1,accounts:[{id:'cash',name:'共享现金',cat:'现金',member:'我',amount:100,prev:100,date:'2026-11-06'}],members:[{name:'我'}],archived:[],snapshots:[]},revision=0,logs=[],password='abc1',uncertain=false,denySave=false,exportCalls=0,expired=false,notifySaved=null,notifyTests=0;
 window.transport=async(path,options={})=>{
   const input=options.body?JSON.parse(options.body):{},method=options.method||'GET';let status=200,data;
   if(expired)return {ok:false,status:401,async json(){return {error:'请登录共享账本'};}};
@@ -31,6 +31,22 @@ window.transport=async(path,options={})=>{
     else if(path==='/api/password'){password=input.password;data={ok:true};}
     else if(path==='/api/export'){exportCalls++;data={format:'jiadi.encrypted',v:1,testContent:input.ledgerBackup?JSON.stringify(ledger):input.content,testName:input.name};}
     else data={ok:true};
+  }else if(path==='/api/notify'){
+    if(method==='PUT'){ notifySaved=input; data={ok:true,enabled:!!input.enabled,cron:input.cron,activeChannels:2,channels:{},items:[]}; }
+    else data={
+      enabled:true, cron:'0 9 * * *', cronDescription:'每天 09:00', sendWhenNothing:false, activeChannels:2,
+      next:[new Date(Date.now()+3600000).toISOString()],
+      channels:{wechat:'https://qyapi.weixin.qq.com/…b00a'},
+      items:[{key:'wechat',value:'https://qyapi.weixin.qq.com/…b00a',enabled:true},
+             {key:'pushplus',value:'{"token":"••"}',enabled:false}],
+      channelsMeta:[{key:'wechat',name:'企业微信（群机器人）',kind:'url',need:[]},
+                    {key:'pushplus',name:'PushPlus',kind:'json',need:['token']},
+                    {key:'feishu',name:'飞书（群机器人）',kind:'url',need:[]}],
+      lastRun:{minute:'2026-11-23T09:00',at:'2026-11-23T09:00:00.000Z',ok:false,skipped:false,attempts:1,
+        results:[{channel:'企业微信（群机器人）',ok:false,detail:'HTTP 500 boom'}]}
+    };
+  }else if(path==='/api/notify/test'){
+    notifyTests++; data={ok:true,results:[{channel:'企业微信（群机器人）',ok:true,detail:''}]};
   }else if(path==='/api/decrypt'){
     if(input.password!=='backup1'){status=400;data={error:'备份密码不正确，或文件已损坏'};}
     else data={name:input.backup.name||'backup.json',content:input.backup.content||JSON.stringify(ledger)};
@@ -119,6 +135,33 @@ await test('shared reports use encrypted export rather than bypassing the passwo
 await test('shared password verification and change are used for the privacy lock',async()=>{
   await a("(async()=>{await setPin('new2','abc1');lockOn();askUnlock();$('#modalInput').value='abc1';await $('#modalOk').onclick();})()");equal(await a('S.privacy'),true);
   await a("(async()=>{$('#modalInput').value='new2';await $('#modalOk').onclick();})()");equal(await a('S.privacy'),false);equal(password,'new2');
+});
+await test('notify drawer lists rows, keeps masked secrets and saves row edits',async()=>{
+  await a('(async()=>{await notifyDrawer();})()');
+  equal(await a("$('#drawerTitle').textContent"),'提醒推送');
+  equal(await a("$('#notifyChBody').children.length"),2,'应渲染两行渠道');
+  equal(await a("$('#notifyChBody').children[0].querySelector('select').value"),'wechat');
+  /* 关掉的行要有 is-off 标记，且掩码值原样回显 */
+  equal(await a("$('#notifyChBody').children[1].classList.contains('is-off')"),true);
+  check((await a("$('#notifyChBody').children[0].querySelector('input.sel').value")).includes('…'),'掩码要回显给用户');
+  check((await a("$('#drawerBody').textContent")).includes('HTTP 500 boom'),'失败原因要显示出来');
+  /* 新增一行 + 保存 */
+  await a("$('#notifyAddCh').click()");
+  equal(await a("$('#notifyChBody').children.length"),3);
+  /* 新行填上飞书地址（空行保存时会被跳过，这是设计如此） */
+  await a("(()=>{const tr=$('#notifyChBody').children[2];const sel=tr.querySelector('select');sel.value='feishu';sel.dispatchEvent(new Event('change'));tr.querySelector('input.sel').value='https://open.feishu.cn/open-apis/bot/v2/hook/xyz';return true;})()");
+  await a("(async()=>{await $('#notifySave').onclick();})()");
+  check(notifySaved,'保存必须打到服务端');
+  equal(notifySaved.items.length,3);
+  equal(notifySaved.items[2].key,'feishu');
+  check(String(notifySaved.items[0].value).includes('…'),'掩码行原样提交，服务端据此保留旧值');
+  equal(notifySaved.cron,'0 9 * * *');
+  /* 试发 */
+  await a('(async()=>{await notifyDrawer();})()');
+  await a("(async()=>{await $('#notifyTest').onclick();})()");
+  equal(notifyTests,1,'试发应打一次');
+  check((await a("$('#toast').textContent")).includes('试发成功'),'成功要有提示');
+  await a("$('#drawerClose2').click()");
 });
 await test('session expiry hides the ledger and closes any amount-bearing drawer',async()=>{
   await a("accountDrawer('cash')");expired=true;await a("SHARED.request('/api/ledger').catch(()=>{})");
