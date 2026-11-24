@@ -96,7 +96,10 @@ await rename(tmpPath, ledgerPath);
 /* 以 root 运行时把属主/权限恢复成原样；非 root 动不了属主，至少保证权限一致 */
 try{
   if(process.getuid && process.getuid() === 0) await chown(ledgerPath, before.uid, before.gid);
-  else if(typeof process.getuid === 'function' && process.getuid() !== before.uid) console.warn('⚠ 当前用户不是文件属主，账本属主仍是原用户，请确认应用能读到。');
+  else if(typeof process.getuid === 'function' && process.getuid() !== before.uid){
+    /* rename 后新 inode 属主是当前用户，不是「仍是原用户」——应用若仍以原属主跑，会读不到 */
+    console.warn('⚠ 当前用户不是原文件属主，写入后账本属主已变成当前用户（uid '+process.getuid()+'）。若应用以其它用户运行，请手动 chown 回原属主：'+ledgerPath);
+  }
   await chmod(ledgerPath, before.mode & 0o777);
 }catch(e){ console.warn('⚠ 恢复属主/权限失败（' + ((e && e.message) || e) + '），请手动确认应用可读：' + ledgerPath); }
 

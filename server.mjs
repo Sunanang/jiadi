@@ -6,7 +6,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {randomBytes, scrypt as scryptCallback, pbkdf2 as pbkdf2Callback, timingSafeEqual, createCipheriv, createDecipheriv} from 'node:crypto';
 import {promisify} from 'node:util';
 import {normalizeData} from './ledger-domain.mjs';
-import {CHANNELS, DEFAULT_NOTIFY, normalizeNotifyConfig, mergeMaskedChannels, mergeMaskedItems, expandChannelItems, maskItems, maskConfig, describeCron, nextRuns, cronMatches, lastScheduledToday, sendAll, buildDigest} from './notify.mjs';
+import {CHANNELS, DEFAULT_NOTIFY, normalizeNotifyConfig, mergeMaskedChannels, mergeMaskedItems, expandChannelItems, maskItems, maskConfig, describeCron, nextRuns, cronMatches, lastScheduledToday, sendAll, buildDigest, failedPieceId} from './notify.mjs';
 
 const scrypt=promisify(scryptCallback),pbkdf2=promisify(pbkdf2Callback), root=dirname(fileURLToPath(import.meta.url));
 const empty=()=>({v:1,accounts:[],members:[],archived:[],snapshots:[]});
@@ -153,6 +153,9 @@ export async function createLedgerApp({
   const notifyTickMs=Number(process.env.JIADI_NOTIFY_TICK_MS)||30000;
   const NOTIFY_RETRY_MAX=3;                                                      // 同一计划时刻最多尝试次数
   const NOTIFY_CATCHUP_MIN=Number(process.env.JIADI_NOTIFY_CATCHUP_MIN ?? 60);   // 错过整点的补发窗口（分钟）
+  /* 补发只在「进程启动后」的窗口内：避免运行中途才启用/改计划被当成错过整点立刻发一条。
+     测试可用 JIADI_NOTIFY_BOOT_AGO_MS 假装进程已运行更久。 */
+  const notifyBootAt=Date.now()-Number(process.env.JIADI_NOTIFY_BOOT_AGO_MS||0);
   const sameLocalDay=(x,y)=>x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()&&x.getDate()===y.getDate();
   let notifyInFlight=false;
   async function runScheduledNotify(){
@@ -164,21 +167,33 @@ export async function createLedgerApp({
     try{
       if(cronMatches(notify.cron,when)) fireAt=when;
       else if(NOTIFY_CATCHUP_MIN>0){
-        /* NAS/应用重启错过整点：今天最近一次计划时间已过、还没发过，就在窗口内补发一次 */
         const last=lastScheduledToday(notify.cron,when);
-        if(last && sameLocalDay(last,when) && (when.getTime()-last.getTime())/60000<=NOTIFY_CATCHUP_MIN) fireAt=last;
+        if(last && sameLocalDay(last,when) && (when.getTime()-last.getTime())/60000<=NOTIFY_CATCHUP_MIN){
+          const key=last.toISOString().slice(0,16);
+          const prev=notify.lastRun;
+          const pendingRetry=!!prev&&prev.minute===key&&!prev.ok&&!prev.skipped
+            &&(prev.attempts||0)<NOTIFY_RETRY_MAX
+            &&Array.isArray(prev.failed)&&prev.failed.length>0;
+          /* 真正的「错过整点」只在进程启动窗口内；运行中途启用/改计划不走这条 */
+          const missedBoot=(!prev||prev.minute!==key)
+            &&(Date.now()-notifyBootAt)/60000<=NOTIFY_CATCHUP_MIN;
+          if(pendingRetry||missedBoot) fireAt=last;
+        }
       }
     }catch(e){ console.error('[提醒推送] cron 无效：'+e.message); return; }
     if(!fireAt) return;
     const fireKey=fireAt.toISOString().slice(0,16);          // 按「应发时刻」去重，补发也算这一次
     const prev=notify.lastRun;
     const sameFire=!!prev&&prev.minute===fireKey;
+    let only=null;
     if(sameFire){
       if(prev.ok||prev.skipped) return;                      // 已成功或主动跳过
       if((prev.attempts||0)>=NOTIFY_RETRY_MAX) return;       // 重试用尽，等下一个计划时刻
+      /* 没有可重试条目时直接停：避免 failed 被清空后 only=null 退化成「全部重发」 */
+      if(!Array.isArray(prev.failed)||!prev.failed.length) return;
+      only=prev.failed;
     }
     const attempts=(sameFire?(prev.attempts||0):0)+1;
-    const only=(sameFire&&Array.isArray(prev.failed)&&prev.failed.length)?prev.failed:null;   // 只重试上次失败的渠道
     notifyInFlight=true;
     try{
       await withNotifyLock(async()=>{ notify={...notify,lastRun:{minute:fireKey,at:when.toISOString(),ok:false,skipped:false,attempts,results:[],failed:only||[],facts:null}}; });
@@ -198,8 +213,8 @@ export async function createLedgerApp({
       const result=await sendAll(channels,{...digest,time:when.toISOString()},{only:only||undefined});
       const failed=result.results.filter(r=>!r.ok);
       await commit({minute:fireKey,at:when.toISOString(),ok:failed.length===0&&result.results.length>0,skipped:false,attempts,
-        facts:digest.facts,failed:failed.map(r=>r.key),
-        results:result.results.map(r=>({channel:r.channel,ok:r.ok,detail:String(r.detail||'').slice(0,200)}))});
+        facts:digest.facts,failed:failed.map(r=>failedPieceId(r.key,r.index)),
+        results:result.results.map(r=>({channel:r.channel,ok:r.ok,detail:String(r.detail||'').slice(0,200),piece:failedPieceId(r.key,r.index)}))});
       if(failed.length) console.error('[提醒推送] 发送失败（第 '+attempts+'/'+NOTIFY_RETRY_MAX+' 次）：'+failed.map(r=>r.channel+':'+r.detail).join('；'));
     }finally{ notifyInFlight=false; }
   }

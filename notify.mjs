@@ -127,7 +127,7 @@ export function describeCron(expr) {
 
 /* ---------------- 渠道配置 ---------------- */
 
-const SENSITIVE = /key|secret|token|password|pass|webhook|url|corp/i;
+const SENSITIVE = /key|secret|token|password|pass|webhook|url|corp|auth/i;
 
 export function splitMulti(value) {
   return String(value || '').split('|').map(s => s.trim()).filter(Boolean);
@@ -161,7 +161,8 @@ function maskUrl(url) {
 function maskObject(obj) {
   const out = {};
   for (const [k, v] of Object.entries(obj || {})) {
-    if (typeof v === 'string' && SENSITIVE.test(k) && v.length > 4) out[k] = v.slice(0, 2) + '…' + v.slice(-2);
+    if (v && typeof v === 'object' && !Array.isArray(v)) out[k] = maskObject(v);
+    else if (typeof v === 'string' && SENSITIVE.test(k) && v.length > 4) out[k] = v.slice(0, 2) + '…' + v.slice(-2);
     else out[k] = v;
   }
   return out;
@@ -171,16 +172,38 @@ export function isMasked(value) {
   return typeof value === 'string' && value.includes('…');
 }
 
-/** 挡掉不该被推送去访问的目标：链路本地（含云元数据 169.254.169.254）与 0.0.0.0。
+/** 主机是否为链路本地 / 云元数据（含 IPv6 映射与常见云厂商地址）。
     内网 192.168/10/172.16 是魔法推送的正常用法，必须放行。 */
+export function blockedHost(hostRaw) {
+  const host = String(hostRaw || '').replace(/^\[|\]$/g, '').toLowerCase().replace(/\.+$/, '');
+  if (host === '0.0.0.0' || host === '::' || host === '') return '地址为空';
+  if (/^169\.254\./.test(host) || host === '100.100.100.200') {
+    return '不允许推送到链路本地地址（含云元数据接口）';
+  }
+  if (/^::ffff:/i.test(host)) {
+    const rest = host.slice(7);
+    if (/^169\.254\./.test(rest)) return '不允许推送到链路本地地址（含云元数据接口）';
+    const hex = rest.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+    if (hex) {
+      const hi = parseInt(hex[1], 16);
+      if (((hi >> 8) & 255) === 169 && (hi & 255) === 254) {
+        return '不允许推送到链路本地地址（含云元数据接口）';
+      }
+    }
+  }
+  if (/^fe80:/i.test(host)) return '不允许推送到链路本地地址（含云元数据接口）';
+  if (/^fd00:ec2:/i.test(host)) return '不允许推送到云元数据地址';
+  if (host === 'metadata.google.internal' || host === 'metadata' || host === 'metadata.goog') {
+    return '不允许推送到云元数据地址';
+  }
+  return null;
+}
+
+/** 挡掉不该被推送去访问的目标 URL（解析主机后走 blockedHost）。 */
 export function blockedTarget(rawUrl) {
   let u;
   try { u = new URL(rawUrl); } catch { return '地址不合法'; }
-  const host = u.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  if (host === '0.0.0.0' || host === '::' || host === '') return '地址为空';
-  if (/^169\.254\./.test(host)) return '不允许推送到链路本地地址（含云元数据接口）';
-  if (host === 'metadata.google.internal' || host === 'metadata') return '不允许推送到云元数据地址';
-  return null;
+  return blockedHost(u.hostname);
 }
 
 function validateChannelPiece(meta, piece) {
@@ -198,12 +221,16 @@ function validateChannelPiece(meta, piece) {
   for (const need of meta.need || []) {
     if (!obj[need]) throw new Error(meta.name + ' 缺少 ' + need);
   }
-  /* JSON 渠道里的地址同样要挡 */
+  /* JSON 渠道里的地址 / SMTP host 同样要挡 */
   for (const field of ['url', 'base_url', 'api_base']) {
     if (typeof obj[field] === 'string') {
       const blocked = blockedTarget(obj[field]);
       if (blocked) throw new Error(meta.name + ' 的 ' + field + ' ' + blocked);
     }
+  }
+  if (typeof obj.host === 'string' && obj.host) {
+    const blocked = blockedHost(obj.host);
+    if (blocked) throw new Error(meta.name + ' 的 host ' + blocked);
   }
 }
 
@@ -350,6 +377,7 @@ async function postJson(fetchImpl, url, body, headers) {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(headers || {}) },
     body: typeof body === 'string' ? body : JSON.stringify(body),
+    redirect: 'error',   // 禁止 302 跳到元数据口绕过 blockedTarget
     signal: AbortSignal.timeout(10000),
   });
   let parsed = null;
@@ -360,7 +388,10 @@ async function postJson(fetchImpl, url, body, headers) {
 /* 企业微信自建应用：gettoken → message/send */
 async function sendWecomApp(fetchImpl, params, message) {
   const api = String(params.api_base || 'https://qyapi.weixin.qq.com').replace(/\/+$/, '');
-  const tokenRes = await fetchImpl(api + '/cgi-bin/gettoken?corpid=' + encodeURIComponent(params.corp_id) + '&corpsecret=' + encodeURIComponent(params.corp_secret), { signal: AbortSignal.timeout(10000) });
+  const tokenRes = await fetchImpl(api + '/cgi-bin/gettoken?corpid=' + encodeURIComponent(params.corp_id) + '&corpsecret=' + encodeURIComponent(params.corp_secret), {
+    redirect: 'error',
+    signal: AbortSignal.timeout(10000),
+  });
   const tokenBody = await tokenRes.json().catch(() => null);
   const token = tokenBody && tokenBody.access_token;
   if (!token) return { ok: false, detail: '取 access_token 失败', response: tokenBody };
@@ -372,55 +403,90 @@ async function sendWecomApp(fetchImpl, params, message) {
   return { ok: send.status < 300 && !(send.body && send.body.errcode), response: send.body, detail: send.body && send.body.errmsg };
 }
 
+function pieceBlocked(key, params) {
+  if (typeof params === 'string') return blockedTarget(params);
+  for (const field of ['url', 'base_url', 'api_base']) {
+    if (typeof params[field] === 'string' && params[field]) {
+      const blocked = blockedTarget(params[field]);
+      if (blocked) return blocked;
+    }
+  }
+  if (key === 'smtp' && typeof params.host === 'string' && params.host) return blockedHost(params.host);
+  return null;
+}
+
+async function sendOnePiece(key, meta, piece, message, fetchImpl, index) {
+  let params;
+  if (meta.kind === 'url') params = piece;
+  else {
+    try { params = JSON.parse(piece); }
+    catch { return { key, index, channel: meta.name, ok: false, detail: '参数不是合法 JSON' }; }
+  }
+  try {
+    /* 配置可能被手改过 notify.json：发送前再拦一次；JSON 渠道要检查所有地址字段 */
+    const blocked = pieceBlocked(key, params);
+    if (blocked) return { key, index, channel: meta.name, ok: false, detail: blocked };
+    if (key === 'wecomapp') {
+      const r = await sendWecomApp(fetchImpl, params, message);
+      return { key, index, channel: meta.name, ok: !!r.ok, detail: r.detail || '', response: r.response };
+    }
+    if (key === 'smtp') {
+      const r = await sendMail(params, message);
+      return { key, index, channel: meta.name, ok: !!r.ok, detail: r.detail || '' };
+    }
+    const req = buildPayload(key, params, message);
+    const { status, body } = await postJson(fetchImpl, req.url, req.body, req.headers);
+    const ok = isOkBody(key, status, body);
+    return {
+      key, index, channel: meta.name, ok,
+      detail: ok ? '' : 'HTTP ' + status + (body && body.errmsg ? ' ' + body.errmsg : ''),
+      response: body,
+    };
+  } catch (e) {
+    return { key, index, channel: meta.name, ok: false, detail: String((e && e.message) || e).slice(0, 160) };
+  }
+}
+
+/** 失败条目 id：同渠道多地址时用 key#下标，避免重试把已成功的那条再发一遍 */
+export function failedPieceId(key, index) {
+  return key + '#' + index;
+}
+
+function shouldSendPiece(only, key, index) {
+  if (!only) return true;
+  return only.has(key) || only.has(failedPieceId(key, index));
+}
+
 /* ---------------- 入口 ---------------- */
 
 export async function sendToChannel(key, value, message, { fetchImpl = globalThis.fetch } = {}) {
   const meta = BY_KEY.get(key);
-  if (!meta) return [{ channel: key, ok: false, detail: '未知渠道' }];
+  if (!meta) return [{ key, index: 0, channel: key, ok: false, detail: '未知渠道' }];
   const results = [];
-  for (const piece of splitMulti(value)) {
-    let params;
-    if (meta.kind === 'url') params = piece;
-    else {
-      try { params = JSON.parse(piece); } catch { results.push({ channel: meta.name, ok: false, detail: '参数不是合法 JSON' }); continue; }
-    }
-    try {
-      /* 配置可能被手改过 notify.json：发送前再拦一次链路本地/元数据地址 */
-      const probe = typeof params === 'string' ? params : (params.url || params.base_url || params.api_base || '');
-      const blocked = probe ? blockedTarget(probe) : null;
-      if (blocked) {
-        results.push({ channel: meta.name, ok: false, detail: blocked });
-        continue;
-      }
-      if (key === 'wecomapp') {
-        const r = await sendWecomApp(fetchImpl, params, message);
-        results.push({ channel: meta.name, ok: !!r.ok, detail: r.detail || '', response: r.response });
-        continue;
-      }
-      if (key === 'smtp') {
-        const r = await sendMail(params, message);
-        results.push({ channel: meta.name, ok: !!r.ok, detail: r.detail || '' });
-        continue;
-      }
-      const req = buildPayload(key, params, message);
-      const { status, body } = await postJson(fetchImpl, req.url, req.body, req.headers);
-      const ok = isOkBody(key, status, body);
-      results.push({ channel: meta.name, ok, detail: ok ? '' : 'HTTP ' + status + (body && body.errmsg ? ' ' + body.errmsg : ''), response: body });
-    } catch (e) {
-      results.push({ channel: meta.name, ok: false, detail: String((e && e.message) || e).slice(0, 160) });
-    }
+  const pieces = splitMulti(value);
+  for (let index = 0; index < pieces.length; index++) {
+    results.push(await sendOnePiece(key, meta, pieces[index], message, fetchImpl, index));
   }
   return results;
 }
 
-/** 只发 failedKeys（重试场景）：避免把已经送达的渠道再发一遍 */
+/** only: ['wechat'] 整渠道，或 ['wechat#0'] 单条地址；避免把已经送达的条目再发一遍 */
 export async function sendAll(channels, message, opts = {}) {
   const only = Array.isArray(opts.only) && opts.only.length ? new Set(opts.only) : null;
+  const fetchImpl = opts.fetchImpl || globalThis.fetch;
   const results = [];
   for (const [key, value] of Object.entries(channels || {})) {
     if (!value) continue;
-    if (only && !only.has(key)) continue;
-    for (const r of await sendToChannel(key, value, message, opts)) results.push({ key, ...r });
+    const meta = BY_KEY.get(key);
+    if (!meta) {
+      results.push({ key, index: 0, channel: key, ok: false, detail: '未知渠道' });
+      continue;
+    }
+    const pieces = splitMulti(value);
+    for (let index = 0; index < pieces.length; index++) {
+      if (!shouldSendPiece(only, key, index)) continue;
+      results.push(await sendOnePiece(key, meta, pieces[index], message, fetchImpl, index));
+    }
   }
   return { ok: results.length > 0 && results.every(r => r.ok), results };
 }

@@ -100,7 +100,7 @@ if [ -f "$PKG" ]; then
   [ "$L" = "$R" ] && ok "本地=NAS md5 $L" || no "md5 不一致 本地=$L NAS=$R"
   T=$(mktemp -d "${TMPDIR:-/tmp}/jd_chk.XXXXXX"); tar xzf "$PKG" -C "$T" 2>/dev/null
   mkdir -p "$T/app" && tar xzf "$T/app.tgz" -C "$T/app" 2>/dev/null
-  for f in jiadi-ui.html server.mjs shared-client.js ledger-domain.mjs; do
+  for f in jiadi-ui.html server.mjs shared-client.js ledger-domain.mjs notify.mjs; do
     A=$(md5 -q "$T/app/$f" 2>/dev/null || md5sum "$T/app/$f" 2>/dev/null | cut -d' ' -f1)
     B=$(ssh "$NAS" "sudo md5sum $APP_DIR/$f | cut -d' ' -f1")
     [ "$A" = "$B" ] && ok "$f 包内=线上" || no "$f 不一致 包=$A 线上=$B"

@@ -7,7 +7,7 @@ import {join} from 'node:path';
 import {webcrypto} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {createLedgerApp,decryptBackup,encryptBackup} from '../server.mjs';
-import {cronMatches, nextRuns, lastScheduledToday, describeCron, normalizeNotifyConfig, mergeMaskedChannels, buildDigest, buildPayload, sendAll, blockedTarget} from '../notify.mjs';
+import {cronMatches, nextRuns, lastScheduledToday, describeCron, normalizeNotifyConfig, mergeMaskedChannels, buildDigest, buildPayload, sendAll, blockedTarget, blockedHost, failedPieceId} from '../notify.mjs';
 
 const ledger=(amount=10)=>({v:1,accounts:[{id:'cash',name:'现金',cat:'现金',member:'我',amount,prev:amount,date:'2026-11-06'}],members:[{name:'我'}],snapshots:[],archived:[]});
 async function fixture(t,config={}){
@@ -650,7 +650,76 @@ test('发送失败只重试失败渠道，成功的渠道不重复发', async t=
     assert.equal(bad,3,'失败渠道应重试到上限 3 次，实际 '+bad);
     const stored=JSON.parse(await readFile(join(dataDir,'notify.json'),'utf8'));
     assert.equal(stored.lastRun.ok,false);
-    assert.deepEqual(stored.lastRun.failed,['wechat'],'失败渠道要记下来供下次只重试它');
+    assert.deepEqual(stored.lastRun.failed,['wechat#0'],'失败条目要记成 key#下标 供下次只重试它');
+  }finally{ globalThis.fetch=original; }
+});
+
+test('同一渠道多地址时只重试失败的那一行', async t=>{
+  const fixed=new Date('2026-11-24T09:00:00');
+  process.env.JIADI_NOTIFY_TICK_MS='40';
+  t.after(()=>{delete process.env.JIADI_NOTIFY_TICK_MS;});
+  const {dataDir,request,login}=await fixture(t,{now:()=>fixed.getTime()});
+  const client=await login('abc1',true);
+  const hits=[];
+  const original=globalThis.fetch;
+  globalThis.fetch=async(url)=>{hits.push(String(url));return String(url).includes('/bad')
+    ? {status:500,async json(){return {errcode:1,errmsg:'boom'};}}
+    : {status:200,async json(){return {errcode:0};}};};
+  try{
+    await request('PUT','/api/notify',{enabled:true,cron:'0 9 * * *',channels:{
+      wechat:'https://example.com/bad | https://example.com/good'}},client);
+    await new Promise(r=>setTimeout(r,600));
+    const bad=hits.filter(u=>u.includes('/bad')).length, good=hits.filter(u=>u.includes('/good')).length;
+    assert.equal(good,1,'同渠道成功行只能收到一次，实际 '+good);
+    assert.equal(bad,3,'同渠道失败行应重试到上限 3 次，实际 '+bad);
+    const stored=JSON.parse(await readFile(join(dataDir,'notify.json'),'utf8'));
+    assert.deepEqual(stored.lastRun.failed,['wechat#0']);
+    assert.equal(failedPieceId('wechat',0),'wechat#0');
+  }finally{ globalThis.fetch=original; }
+});
+
+test('进程已运行超过补发窗口时，中途启用不会立刻补发', async t=>{
+  const fixed=new Date('2026-11-24T10:00:00');
+  process.env.JIADI_NOTIFY_TICK_MS='40';
+  process.env.JIADI_NOTIFY_BOOT_AGO_MS=String(2*60*60*1000);   // 假装已跑 2 小时
+  t.after(()=>{delete process.env.JIADI_NOTIFY_TICK_MS;delete process.env.JIADI_NOTIFY_BOOT_AGO_MS;});
+  const {request,login}=await fixture(t,{now:()=>fixed.getTime()});
+  const client=await login('abc1',true);
+  const calls=[];
+  const original=globalThis.fetch;
+  globalThis.fetch=async()=>{calls.push(1);return {status:200,async json(){return {errcode:0};}};};
+  try{
+    await request('PUT','/api/notify',{enabled:true,cron:'0 9 * * *',channels:{wechat:'https://example.com/hook'}},client);
+    await new Promise(r=>setTimeout(r,400));
+    assert.equal(calls.length,0,'长跑进程中途启用不得走补发，实际 '+calls.length);
+  }finally{ globalThis.fetch=original; }
+});
+
+test('失败条目被删光后不会退化成全部重发', async t=>{
+  const fixed=new Date('2026-11-24T09:00:00');
+  process.env.JIADI_NOTIFY_TICK_MS='40';
+  t.after(()=>{delete process.env.JIADI_NOTIFY_TICK_MS;});
+  const {dataDir,request,login}=await fixture(t,{now:()=>fixed.getTime()});
+  const client=await login('abc1',true);
+  const hits=[];
+  const original=globalThis.fetch;
+  globalThis.fetch=async(url)=>{hits.push(String(url));return String(url).includes('/bad')
+    ? {status:500,async json(){return {errcode:1,errmsg:'boom'};}}
+    : {status:200,async json(){return {errcode:0};}};};
+  try{
+    await request('PUT','/api/notify',{enabled:true,cron:'0 9 * * *',channels:{
+      wechat:'https://example.com/bad', dingtalk:'https://example.com/good'}},client);
+    await new Promise(r=>setTimeout(r,200));
+    const afterFirst=hits.filter(u=>u.includes('/good')).length;
+    assert.equal(afterFirst,1);
+    /* 删掉失败渠道，只留已成功的 */
+    await request('PUT','/api/notify',{enabled:true,cron:'0 9 * * *',channels:{
+      dingtalk:'https://example.com/good'}},client);
+    const before=hits.length;
+    await new Promise(r=>setTimeout(r,400));
+    assert.equal(hits.length,before,'失败渠道删光后不得再向剩余渠道重发');
+    const stored=JSON.parse(await readFile(join(dataDir,'notify.json'),'utf8'));
+    assert.equal(stored.lastRun.ok,false);
   }finally{ globalThis.fetch=original; }
 });
 
@@ -658,12 +727,24 @@ test('推送目标不许打向链路本地与云元数据地址', async()=>{
   assert.equal(blockedTarget('http://169.254.169.254/latest/meta-data'),'不允许推送到链路本地地址（含云元数据接口）');
   assert.equal(blockedTarget('http://localhost:8080/x'),null,'本机地址要放行（自测/本地钩子）');
   assert.equal(blockedTarget('http://192.168.1.9:818/api/push'),null,'内网地址要放行（魔法推送常用）');
+  assert.match(blockedTarget('http://[::ffff:169.254.169.254]/'),/链路本地/);
+  assert.match(blockedTarget('http://metadata.google.internal./'),/云元数据/);
+  assert.match(blockedHost('fe80::1'),/链路本地/);
+  assert.match(blockedHost('100.100.100.200'),/链路本地|元数据/);
   assert.throws(()=>normalizeNotifyConfig({enabled:false,cron:'0 9 * * *',channels:{wechat:'http://169.254.169.254/x'}}),/链路本地/);
   assert.throws(()=>normalizeNotifyConfig({enabled:false,cron:'0 9 * * *',channels:{magicpush:JSON.stringify({base_url:'http://169.254.169.254',token:'t'})}}),/链路本地/);
-  /* 手改 notify.json 绕过校验时，发送层还要再拦一次 */
+  assert.throws(()=>normalizeNotifyConfig({enabled:false,cron:'0 9 * * *',channels:{smtp:JSON.stringify({host:'169.254.169.254',to:'a@b.c'})}}),/host/);
+  /* 手改 notify.json 绕过校验时，发送层还要再拦一次；含伪装无害 url 字段 */
   const res=await sendAll({wechat:'http://169.254.169.254/latest'}, {title:'t',content:'c'}, {fetchImpl:async()=>{throw new Error('不该发出去');}});
   assert.equal(res.ok,false);
   assert.match(res.results[0].detail,/链路本地/);
+  const sneak=await sendAll(
+    {webhook:JSON.stringify({url:'https://example.com/ok',api_base:'http://169.254.169.254/x'})},
+    {title:'t',content:'c'},
+    {fetchImpl:async()=>{throw new Error('不该发出去');}}
+  );
+  assert.equal(sneak.ok,false);
+  assert.match(sneak.results[0].detail,/链路本地/);
 });
 
 test('摘要口径与首页提醒一致：关户/不提醒/不计净值都不算，日期按本地算', async()=>{
