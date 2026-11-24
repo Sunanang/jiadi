@@ -69,9 +69,8 @@ export function validCron(expr) {
   try { parseCron(expr); return true; } catch { return false; }
 }
 
-/** 分钟级匹配；日与周同时受限时按 cron 惯例取「或」 */
-export function cronMatches(expr, date) {
-  const c = parseCron(expr);
+/** 分钟级匹配（已解析版本）；日与周同时受限时按 cron 惯例取「或」 */
+export function cronMatchesParsed(c, date) {
   const minute = date.getMinutes(), hour = date.getHours();
   const dom = date.getDate(), month = date.getMonth() + 1, dow = date.getDay();
   if (!c.minute.has(minute) || !c.hour.has(hour) || !c.month.has(month)) return false;
@@ -83,13 +82,32 @@ export function cronMatches(expr, date) {
   return domOk || dowOk;
 }
 
+/** 分钟级匹配；日与周同时受限时按 cron 惯例取「或」 */
+export function cronMatches(expr, date) {
+  return cronMatchesParsed(parseCron(expr), date);
+}
+
+/** 今天（本地日历日）最近一次已经到点的计划时间；没有则 null。用于应用/NAS 重启后的补发 */
+export function lastScheduledToday(expr, now = new Date()) {
+  const c = parseCron(expr);
+  const cursor = new Date(now.getTime());
+  cursor.setSeconds(0, 0);
+  for (let i = 0; i <= 24 * 60; i++) {
+    if (cronMatchesParsed(c, cursor)) return new Date(cursor.getTime());
+    if (cursor.getDate() !== now.getDate()) return null;
+    cursor.setMinutes(cursor.getMinutes() - 1);
+  }
+  return null;
+}
+
 export function nextRuns(expr, from = new Date(), count = 3, limitMinutes = 60 * 24 * 366) {
+  const c = parseCron(expr);          // 只解析一次：原来每分钟都 parseCron，年/月级计划会卡几秒
   const out = [];
   const cursor = new Date(from.getTime());
   cursor.setSeconds(0, 0);
   cursor.setMinutes(cursor.getMinutes() + 1);
   for (let i = 0; i < limitMinutes && out.length < count; i++) {
-    if (cronMatches(expr, cursor)) out.push(new Date(cursor.getTime()));
+    if (cronMatchesParsed(c, cursor)) out.push(new Date(cursor.getTime()));
     cursor.setMinutes(cursor.getMinutes() + 1);
   }
   return out;
@@ -109,7 +127,7 @@ export function describeCron(expr) {
 
 /* ---------------- 渠道配置 ---------------- */
 
-const SENSITIVE = /key|secret|token|password|pass|webhook|url|corp/i;
+const SENSITIVE = /key|secret|token|password|pass|webhook|url|corp|auth/i;
 
 export function splitMulti(value) {
   return String(value || '').split('|').map(s => s.trim()).filter(Boolean);
@@ -143,7 +161,8 @@ function maskUrl(url) {
 function maskObject(obj) {
   const out = {};
   for (const [k, v] of Object.entries(obj || {})) {
-    if (typeof v === 'string' && SENSITIVE.test(k) && v.length > 4) out[k] = v.slice(0, 2) + '…' + v.slice(-2);
+    if (v && typeof v === 'object' && !Array.isArray(v)) out[k] = maskObject(v);
+    else if (typeof v === 'string' && SENSITIVE.test(k) && v.length > 4) out[k] = v.slice(0, 2) + '…' + v.slice(-2);
     else out[k] = v;
   }
   return out;
@@ -153,11 +172,47 @@ export function isMasked(value) {
   return typeof value === 'string' && value.includes('…');
 }
 
+/** 主机是否为链路本地 / 云元数据（含 IPv6 映射与常见云厂商地址）。
+    内网 192.168/10/172.16 是魔法推送的正常用法，必须放行。 */
+export function blockedHost(hostRaw) {
+  const host = String(hostRaw || '').replace(/^\[|\]$/g, '').toLowerCase().replace(/\.+$/, '');
+  if (host === '0.0.0.0' || host === '::' || host === '') return '地址为空';
+  if (/^169\.254\./.test(host) || host === '100.100.100.200') {
+    return '不允许推送到链路本地地址（含云元数据接口）';
+  }
+  if (/^::ffff:/i.test(host)) {
+    const rest = host.slice(7);
+    if (/^169\.254\./.test(rest)) return '不允许推送到链路本地地址（含云元数据接口）';
+    const hex = rest.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+    if (hex) {
+      const hi = parseInt(hex[1], 16);
+      if (((hi >> 8) & 255) === 169 && (hi & 255) === 254) {
+        return '不允许推送到链路本地地址（含云元数据接口）';
+      }
+    }
+  }
+  if (/^fe80:/i.test(host)) return '不允许推送到链路本地地址（含云元数据接口）';
+  if (/^fd00:ec2:/i.test(host)) return '不允许推送到云元数据地址';
+  if (host === 'metadata.google.internal' || host === 'metadata' || host === 'metadata.goog') {
+    return '不允许推送到云元数据地址';
+  }
+  return null;
+}
+
+/** 挡掉不该被推送去访问的目标 URL（解析主机后走 blockedHost）。 */
+export function blockedTarget(rawUrl) {
+  let u;
+  try { u = new URL(rawUrl); } catch { return '地址不合法'; }
+  return blockedHost(u.hostname);
+}
+
 function validateChannelPiece(meta, piece) {
   if (meta.kind === 'url') {
     let u;
     try { u = new URL(piece); } catch { throw new Error(meta.name + ' 的地址不是合法 URL'); }
     if (!/^https?:$/.test(u.protocol)) throw new Error(meta.name + ' 只支持 http/https 地址');
+    const blocked = blockedTarget(piece);
+    if (blocked) throw new Error(meta.name + ' ' + blocked);
     return;
   }
   let obj;
@@ -165,6 +220,17 @@ function validateChannelPiece(meta, piece) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error(meta.name + ' 的参数必须是 JSON 对象');
   for (const need of meta.need || []) {
     if (!obj[need]) throw new Error(meta.name + ' 缺少 ' + need);
+  }
+  /* JSON 渠道里的地址 / SMTP host 同样要挡 */
+  for (const field of ['url', 'base_url', 'api_base']) {
+    if (typeof obj[field] === 'string') {
+      const blocked = blockedTarget(obj[field]);
+      if (blocked) throw new Error(meta.name + ' 的 ' + field + ' ' + blocked);
+    }
+  }
+  if (typeof obj.host === 'string' && obj.host) {
+    const blocked = blockedHost(obj.host);
+    if (blocked) throw new Error(meta.name + ' 的 host ' + blocked);
   }
 }
 
@@ -311,6 +377,7 @@ async function postJson(fetchImpl, url, body, headers) {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(headers || {}) },
     body: typeof body === 'string' ? body : JSON.stringify(body),
+    redirect: 'error',   // 禁止 302 跳到元数据口绕过 blockedTarget
     signal: AbortSignal.timeout(10000),
   });
   let parsed = null;
@@ -321,7 +388,10 @@ async function postJson(fetchImpl, url, body, headers) {
 /* 企业微信自建应用：gettoken → message/send */
 async function sendWecomApp(fetchImpl, params, message) {
   const api = String(params.api_base || 'https://qyapi.weixin.qq.com').replace(/\/+$/, '');
-  const tokenRes = await fetchImpl(api + '/cgi-bin/gettoken?corpid=' + encodeURIComponent(params.corp_id) + '&corpsecret=' + encodeURIComponent(params.corp_secret), { signal: AbortSignal.timeout(10000) });
+  const tokenRes = await fetchImpl(api + '/cgi-bin/gettoken?corpid=' + encodeURIComponent(params.corp_id) + '&corpsecret=' + encodeURIComponent(params.corp_secret), {
+    redirect: 'error',
+    signal: AbortSignal.timeout(10000),
+  });
   const tokenBody = await tokenRes.json().catch(() => null);
   const token = tokenBody && tokenBody.access_token;
   if (!token) return { ok: false, detail: '取 access_token 失败', response: tokenBody };
@@ -333,47 +403,92 @@ async function sendWecomApp(fetchImpl, params, message) {
   return { ok: send.status < 300 && !(send.body && send.body.errcode), response: send.body, detail: send.body && send.body.errmsg };
 }
 
+function pieceBlocked(key, params) {
+  if (typeof params === 'string') return blockedTarget(params);
+  for (const field of ['url', 'base_url', 'api_base']) {
+    if (typeof params[field] === 'string' && params[field]) {
+      const blocked = blockedTarget(params[field]);
+      if (blocked) return blocked;
+    }
+  }
+  if (key === 'smtp' && typeof params.host === 'string' && params.host) return blockedHost(params.host);
+  return null;
+}
+
+async function sendOnePiece(key, meta, piece, message, fetchImpl, index) {
+  let params;
+  if (meta.kind === 'url') params = piece;
+  else {
+    try { params = JSON.parse(piece); }
+    catch { return { key, index, channel: meta.name, ok: false, detail: '参数不是合法 JSON' }; }
+  }
+  try {
+    /* 配置可能被手改过 notify.json：发送前再拦一次；JSON 渠道要检查所有地址字段 */
+    const blocked = pieceBlocked(key, params);
+    if (blocked) return { key, index, channel: meta.name, ok: false, detail: blocked };
+    if (key === 'wecomapp') {
+      const r = await sendWecomApp(fetchImpl, params, message);
+      return { key, index, channel: meta.name, ok: !!r.ok, detail: r.detail || '', response: r.response };
+    }
+    if (key === 'smtp') {
+      const r = await sendMail(params, message);
+      return { key, index, channel: meta.name, ok: !!r.ok, detail: r.detail || '' };
+    }
+    const req = buildPayload(key, params, message);
+    const { status, body } = await postJson(fetchImpl, req.url, req.body, req.headers);
+    const ok = isOkBody(key, status, body);
+    return {
+      key, index, channel: meta.name, ok,
+      detail: ok ? '' : 'HTTP ' + status + (body && body.errmsg ? ' ' + body.errmsg : ''),
+      response: body,
+    };
+  } catch (e) {
+    return { key, index, channel: meta.name, ok: false, detail: String((e && e.message) || e).slice(0, 160) };
+  }
+}
+
+/** 失败条目 id：同渠道多地址时用 key#下标，避免重试把已成功的那条再发一遍 */
+export function failedPieceId(key, index) {
+  return key + '#' + index;
+}
+
+function shouldSendPiece(only, key, index) {
+  if (!only) return true;
+  return only.has(key) || only.has(failedPieceId(key, index));
+}
+
 /* ---------------- 入口 ---------------- */
 
 export async function sendToChannel(key, value, message, { fetchImpl = globalThis.fetch } = {}) {
   const meta = BY_KEY.get(key);
-  if (!meta) return [{ channel: key, ok: false, detail: '未知渠道' }];
+  if (!meta) return [{ key, index: 0, channel: key, ok: false, detail: '未知渠道' }];
   const results = [];
-  for (const piece of splitMulti(value)) {
-    let params;
-    if (meta.kind === 'url') params = piece;
-    else {
-      try { params = JSON.parse(piece); } catch { results.push({ channel: meta.name, ok: false, detail: '参数不是合法 JSON' }); continue; }
-    }
-    try {
-      if (key === 'wecomapp') {
-        const r = await sendWecomApp(fetchImpl, params, message);
-        results.push({ channel: meta.name, ok: !!r.ok, detail: r.detail || '', response: r.response });
-        continue;
-      }
-      if (key === 'smtp') {
-        const r = await sendMail(params, message);
-        results.push({ channel: meta.name, ok: !!r.ok, detail: r.detail || '' });
-        continue;
-      }
-      const req = buildPayload(key, params, message);
-      const { status, body } = await postJson(fetchImpl, req.url, req.body, req.headers);
-      const ok = isOkBody(key, status, body);
-      results.push({ channel: meta.name, ok, detail: ok ? '' : 'HTTP ' + status + (body && body.errmsg ? ' ' + body.errmsg : ''), response: body });
-    } catch (e) {
-      results.push({ channel: meta.name, ok: false, detail: String((e && e.message) || e).slice(0, 160) });
-    }
+  const pieces = splitMulti(value);
+  for (let index = 0; index < pieces.length; index++) {
+    results.push(await sendOnePiece(key, meta, pieces[index], message, fetchImpl, index));
   }
   return results;
 }
 
+/** only: ['wechat'] 整渠道，或 ['wechat#0'] 单条地址；避免把已经送达的条目再发一遍 */
 export async function sendAll(channels, message, opts = {}) {
+  const only = Array.isArray(opts.only) && opts.only.length ? new Set(opts.only) : null;
+  const fetchImpl = opts.fetchImpl || globalThis.fetch;
   const results = [];
   for (const [key, value] of Object.entries(channels || {})) {
     if (!value) continue;
-    results.push(...await sendToChannel(key, value, message, opts));
+    const meta = BY_KEY.get(key);
+    if (!meta) {
+      results.push({ key, index: 0, channel: key, ok: false, detail: '未知渠道' });
+      continue;
+    }
+    const pieces = splitMulti(value);
+    for (let index = 0; index < pieces.length; index++) {
+      if (!shouldSendPiece(only, key, index)) continue;
+      results.push(await sendOnePiece(key, meta, pieces[index], message, fetchImpl, index));
+    }
   }
-  return { ok: results.some(r => r.ok), results };
+  return { ok: results.length > 0 && results.every(r => r.ok), results };
 }
 
 /* ---------------- 最小 SMTP（无依赖） ---------------- */
@@ -456,23 +571,29 @@ async function sendMail(params, message) {
 
 /* ---------------- 摘要内容（纯文本，不带具体金额） ---------------- */
 
+/** 本地日历日（yyyy-mm-dd）。注意不能用 toISOString：那是 UTC，东八区 00:00–08:00 会差一天。 */
+const localYmd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
 export function buildDigest(ledger, now = new Date(), opts = {}) {
   const accounts = Array.isArray(ledger && ledger.accounts) ? ledger.accounts : [];
   const snapshots = Array.isArray(ledger && ledger.snapshots) ? ledger.snapshots : [];
-  const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const ym = localYmd(now).slice(0, 7);
+  const today = localYmd(now);
   const checkinMissing = !snapshots.some(s => s.month === ym);
   const staleDays = Number(opts.staleDays || 45);
+  /* 与首页提醒口径一致：关户 / 不参与提醒 / 不计入净值的账户都不提醒 */
+  const remindable = a => !a.closed && a.remind !== false && a.inNet !== false;
   const stale = accounts.filter(a => {
-    if (a.closed || a.remind === false) return false;
+    if (!remindable(a)) return false;
     const t = Date.parse(String(a.date || '') + 'T00:00:00');
     return Number.isFinite(t) && (now.getTime() - t) / 86400000 > staleDays;
   }).length;
   const lead = Number(opts.dueLeadDays || 30);
   const dueSoon = accounts.filter(a => {
-    if (!a.due) return false;
+    if (!a.due || !remindable(a)) return false;
     const d = Date.parse(a.due + 'T00:00:00');
     if (!Number.isFinite(d)) return false;
-    const days = (d - Date.parse(now.toISOString().slice(0, 10) + 'T00:00:00')) / 86400000;
+    const days = (d - Date.parse(today + 'T00:00:00')) / 86400000;
     return days >= 0 && days <= lead;
   }).length;
   const counted = accounts.filter(a => !a.closed && a.inNet !== false);

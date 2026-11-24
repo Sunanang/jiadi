@@ -140,6 +140,9 @@ npm start
 - 配置只存在服务端数据目录的 `notify.json`（权限 0600），**不进账本**（账本会下发给每个客户端，渠道密钥不能跟着走）；界面回显的是掩码，不动它保存就保持原值
 - 有「试发」按钮；「没有异常也发一条」可让每周/每月的固定汇报照常发出
 - 需要共享账本服务（在飞牛应用里打开）；纯本地单文件模式没有服务端定时器
+- 错过整点会补发：仅在**进程启动后**的窗口内（默认 60 分钟，`JIADI_NOTIFY_CATCHUP_MIN`，设 0 关闭）补最近一次计划；运行中途才启用/改计划不会立刻当补发发出
+- 发送失败只重试失败的条目（渠道 + 地址行，最多 3 次）；同一渠道多行时，已成功的那行不会再发
+- 配置存在数据目录，**不随账本备份/导出迁移**；换机或重装后要重新填一次渠道
 
 ## 忘记应用密码怎么办
 
@@ -187,6 +190,7 @@ node /vol1/@appcenter/jiadi/reset-vault.mjs --data-dir /vol1/@appdata/jiadi/data
 
 ```
 ├── server.mjs          # Node 22 服务：网关 socket / 统一登录 / 账本读写 / 密码门禁 / 草稿暂存
+├── notify.mjs          # 提醒推送：cron、渠道、摘要、SSRF 拦阻
 ├── jiadi-ui.html       # 单文件前端（逻辑在 <script id="ledgerApp"> 内，由 shared-client.js 注入执行）
 ├── shared-client.js    # 会话、密码页、空闲锁、轮询、草稿存取
 ├── ledger-domain.mjs   # normalizeData 严格校验
